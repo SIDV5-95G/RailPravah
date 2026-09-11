@@ -13,6 +13,7 @@
     "dev:backend": "tsx watch src/server.ts",
     "dev:frontend": "npm --prefix frontend run dev",
     "install:all": "npm install && npm --prefix frontend install",
+    "postinstall": "npm --prefix frontend install",
     "test": "tsx src/tests/verify-api.ts"
   },
   "keywords": [
