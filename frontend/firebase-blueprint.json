@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "UserProfile": {
+      "collection": "users",
+      "fields": {
+        "id": { "type": "string", "description": "Firebase Auth UID or unique ID" },
+        "name": { "type": "string", "description": "Display name" },
+        "email": { "type": "string", "description": "User email address" },
+        "empId": { "type": "string", "description": "Employee ID" },
+        "userRole": { "type": "string", "description": "Assigned role: worker, supervisor, zonal_head, department_user, coa_admin" },
+        "department": { "type": "string", "description": "Department name" },
+        "role": { "type": "string", "description": "Designation title" },
+        "avatarUrl": { "type": "string", "description": "Avatar photo URL" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Update timestamp" }
+      }
+    },
+    "SlotNotification": {
+      "collection": "notifications",
+      "fields": {
+        "id": { "type": "string", "description": "Unique notification ID" },
+        "slotId": { "type": "string", "description": "Associated slot ID" },
+        "slotCode": { "type": "string", "description": "Sanctioned slot code" },
+        "title": { "type": "string", "description": "Notification title" },
+        "message": { "type": "string", "description": "Full notification message" },
+        "timing": { "type": "string", "description": "Slot timing string" },
+        "date": { "type": "string", "description": "Slot execution date" },
+        "location": { "type": "string", "description": "Track section or corridor" },
+        "workName": { "type": "string", "description": "Name of maintenance work" },
+        "departments": { "type": "array", "description": "List of departments involved" },
+        "recipientRoles": { "type": "array", "description": "List of target roles" },
+        "sanctionedBy": { "type": "string", "description": "Approving entity" },
+        "status": { "type": "string", "description": "active or acknowledged" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    }
+  }
+}

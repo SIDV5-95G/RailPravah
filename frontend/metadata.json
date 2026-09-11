@@ -1,0 +1,11 @@
+{
+  "name": "Remix Remix Remix Remix Remix Remix Railप्रवाह",
+  "description": "Mumbai Division Central Line railway operational control system featuring AI scheduling, conflict resolution, what-if delay impact simulation, and maintenance optimization.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "name": "railpravah-backend",
+  "version": "1.0.0",
+  "description": "RailPravah - AI-Powered Automatic Block Planning for Train Operations on Indian Railways",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "build:backend": "tsc",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:all": "npm run build:backend && npm run build:frontend",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "dev:backend": "tsx watch src/server.ts",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "install:all": "npm install && npm --prefix frontend install",
+    "test": "tsx src/tests/verify-api.ts"
+  },
+  "keywords": [
+    "railpravah",
+    "indian-railways",
+    "block-planning",
+    "supabase",
+    "gemini",
+    "ai"
+  ],
+  "author": "RailPravah Team",
+  "license": "ISC",
+  "dependencies": {
+    "@google/genai": "^2.21.0",
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.48.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
