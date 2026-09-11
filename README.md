@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Smart India Hackathon 2026](https://img.shields.io/badge/SIH-2026_Finalist-orange.svg)](https://sih.gov.in)
+[![Smart India Hackathon 2026](https://img.shields.io/badge/SIH-2026-orange.svg)](https://sih.gov.in)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org)
 [![React](https://img.shields.io/badge/React-19.0-61dafb.svg)](https://react.dev)
