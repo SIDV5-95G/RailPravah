@@ -11,7 +11,7 @@
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
 
 **An AI-driven, multi-departmental corridor possession scheduling and conflict resolution platform for Indian Railways.**  
-*Developed for the Smart India Hackathon (SIH) by Team Innovatrix.*
+*Developed for the Smart India Hackathon (SIH) by Team Innovatrix Club.*
 
 </div>
 
