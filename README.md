@@ -255,6 +255,30 @@ npm run dev:frontend
 
 ---
 
+## ⚡ Deployment on Vercel
+
+RailPravah is fully configured for seamless, zero-config deployment on **Vercel** with integrated Serverless API handling via [`vercel.json`](file:///Users/siddharthgupta/SIH_INNOVATRIX/vercel.json):
+
+### Steps to Deploy on Vercel:
+
+1. **Push your code to GitHub** (see instructions below).
+2. Go to [vercel.com](https://vercel.com) and click **"Add New Project"** ➔ **"Import Git Repository"**.
+3. Select your `RailPravah` repository.
+4. In the **Configure Project** screen:
+   - **Framework Preset**: *Vite* (or *Other*)
+   - **Build Command**: `npm run build:all`
+   - **Output Directory**: `frontend/dist`
+5. Under **Environment Variables**, add:
+   - `SUPABASE_URL` = `your-supabase-url`
+   - `SUPABASE_ANON_KEY` = `your-supabase-anon-key`
+   - `SUPABASE_SERVICE_ROLE_KEY` = `your-supabase-service-role-key`
+   - `GEMINI_API_KEY` = `your-gemini-api-key`
+   - `GEMINI_MODEL` = `gemini-2.5-flash`
+6. Click **Deploy**!
+   - *Vercel will build both the frontend and serverless API endpoints under one unified `.vercel.app` domain!*
+
+---
+
 ## 🐙 How to Upload to GitHub
 
 Follow these simple steps to upload this complete project to your GitHub account:

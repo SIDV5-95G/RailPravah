@@ -11,12 +11,14 @@ export const createApp = () => {
   // Global Middleware
   app.use(helmet());
   app.use(cors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://127.0.0.1:5173',
-    ],
+    origin: (origin, callback) => {
+      // Allow localhost, vercel deployments, or requests with no origin (curl/mobile/tools)
+      if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Allow all for hackathon demonstration
+      }
+    },
     credentials: true,
     allowedHeaders: [
       'Content-Type',
