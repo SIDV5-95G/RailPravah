@@ -136,9 +136,9 @@ RAIL_PRAVAH_FRONTEND/
 
 ---
 
-## 👥 Contributors — Team Innovatrix
+## 👥 Contributors — Team Innovatrix Club
 
-- **Siddharth Gupta** — *Lead Frontend Architect & UI/UX Developer*
+- **Team Innovatrix Club**
 - *Smart India Hackathon (SIH) 2026*
 
 ---

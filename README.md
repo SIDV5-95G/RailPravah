@@ -107,8 +107,8 @@ Indian Railways operates over **13,000 passenger trains** and **9,000 freight se
 |---|---|---|
 | **Tier 1** | **Field Worker** | Geotagged defect logging, voice notes, photo uploads, field status updates. |
 | **Tier 2** | **Section Supervisor (SSE)** | Verification of field defects, gang & tool roster allocation, preliminary clustering. |
-| **Tier 3** | **Department Head** | Joint clearances, departmental resource sanctioning, machine roster scheduling. |
-| **Tier 4** | **Zonal Head (Operating)** | Multi-divisional corridor possession review, speed restrictions, caution orders. |
+| **Tier 3** | **Zonal Head (Operating)** | Multi-divisional corridor possession review, speed restrictions, caution orders. |
+| **Tier 4** | **Department Head** | Joint clearances, departmental resource sanctioning, machine roster scheduling. |
 | **Tier 5** | **COA Central Controller** | Apex Traffic Authority — **प्रवाहPLAN** execution, master calendar locks, circular issuance. |
 
 ---
@@ -291,9 +291,9 @@ git push -u origin main
 
 ---
 
-## 👥 Contributors — Team Innovatrix
+## 👥 Contributors — Team Innovatrix Club
 
-- **Siddharth Gupta** — *Lead Architect & Full-Stack Engineer*
+- **Team Innovatrix Club**
 - *Smart India Hackathon (SIH) 2026*
 
 ---
