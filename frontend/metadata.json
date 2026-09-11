@@ -1,6 +1,6 @@
 {
-  "name": "Remix Remix Remix Remix Remix Remix Railप्रवाह",
-  "description": "Mumbai Division Central Line railway operational control system featuring AI scheduling, conflict resolution, what-if delay impact simulation, and maintenance optimization.",
+  "name": "RailPravah — AI Corridor Block Planning & Traffic Management Console",
+  "description": "Indian Railways Central Line operational control system featuring AI block scheduling, multi-department conflict resolution, What-If delay simulation, and WhySlot XAI.",
   "requestFramePermissions": [
     "geolocation",
     "microphone"
