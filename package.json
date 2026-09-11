@@ -6,14 +6,13 @@
   "scripts": {
     "build": "tsc",
     "build:backend": "tsc",
-    "build:frontend": "npm --prefix frontend run build",
+    "build:frontend": "npm --prefix frontend install && npm --prefix frontend run build",
     "build:all": "npm run build:backend && npm run build:frontend",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "dev:backend": "tsx watch src/server.ts",
     "dev:frontend": "npm --prefix frontend run dev",
     "install:all": "npm install && npm --prefix frontend install",
-    "postinstall": "npm --prefix frontend install",
     "test": "tsx src/tests/verify-api.ts"
   },
   "keywords": [
