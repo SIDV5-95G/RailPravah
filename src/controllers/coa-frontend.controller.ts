@@ -83,7 +83,7 @@ export async function broadcastSlotApprovalNotification(params: SlotApprovalNoti
       ? 'Section Supervisor'
       : 'COA Central Dispatch';
 
-  const normSlotCode = (params.slotCode || `SANCTION-CR-${Date.now().toString().slice(-4)}`).trim().toUpperCase();
+  const normSlotCode = (params.slotCode || `SLOT-CR-${Date.now().toString().slice(-4)}`).trim().toUpperCase();
   const canonicalId = `notif-slot-${normSlotCode.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`;
   const dateStr = params.date || new Date().toISOString().split('T')[0];
   const startTime = params.startTime || '01:30';
@@ -94,8 +94,8 @@ export async function broadcastSlotApprovalNotification(params: SlotApprovalNoti
     id: canonicalId,
     slotId: params.slotId || `slot-${normSlotCode}`,
     slotCode: normSlotCode,
-    title: `[SLOT SANCTIONED: ${roleLabel}] ${deptLabel} Track Possession Window`,
-    message: `${params.sanctionedByName || roleLabel} has sanctioned a maintenance possession slot for ${params.location} on ${dateStr} (${timing}). Work: ${params.workName}. ${params.notes ? `Details: ${params.notes}` : 'Possession window locked.'}`,
+    title: `[SLOT SANCTIONED: ${normSlotCode}] ${deptLabel} Track Possession Window`,
+    message: `${params.sanctionedByName || roleLabel} has sanctioned a maintenance possession slot [${normSlotCode}] for ${params.location} on ${dateStr} (${timing}). Work: ${params.workName}. ${params.notes ? `Details: ${params.notes}` : 'Possession window locked under प्रवाहPlan AI Schedule Optimizer.'}`,
     timing,
     startTime,
     endTime,
@@ -110,17 +110,25 @@ export async function broadcastSlotApprovalNotification(params: SlotApprovalNoti
     status: 'active' as const,
   };
 
-  // 1. Deduplicate and update in-memory stores
+  // 1. Deduplicate and update in-memory stores (both by slotCode and location+date)
   coaFrontendStore.slotNotifications = coaFrontendStore.slotNotifications.filter(
-    (n) => (n.slotCode ? n.slotCode.toUpperCase() !== normSlotCode : true) && n.id !== canonicalId
+    (n) => {
+      if (n.id === canonicalId) return false;
+      if (n.slotCode && n.slotCode.toUpperCase() === normSlotCode) return false;
+      if (n.location === params.location && n.date === dateStr && n.timing === timing) return false;
+      return true;
+    }
   );
   coaFrontendStore.slotNotifications.unshift(slotNotification);
 
   inMemoryStore.notifications = inMemoryStore.notifications.filter(
-    (n: any) =>
-      ((n as any).slotCode && (n as any).slotCode.toUpperCase() === normSlotCode)
-        ? false
-        : (n.id !== canonicalId && !(n.message && n.message.includes(normSlotCode)))
+    (n: any) => {
+      if (n.id === canonicalId) return false;
+      if ((n as any).slotCode && (n as any).slotCode.toUpperCase() === normSlotCode) return false;
+      if (n.message && n.message.includes(normSlotCode)) return false;
+      if (n.message && n.message.includes(params.location) && n.message.includes(dateStr)) return false;
+      return true;
+    }
   );
   inMemoryStore.notifications.unshift({
     id: slotNotification.id,
@@ -144,12 +152,12 @@ export async function broadcastSlotApprovalNotification(params: SlotApprovalNoti
         .or(`department.eq.${deptKey},role.eq.coa_admin`);
 
       if (targetProfiles && targetProfiles.length > 0) {
-        // Remove older duplicates for the same slotCode from notifications table
+        // Remove older duplicates for the same slotCode or location from notifications table
         try {
           await supabaseAdmin
             .from('notifications')
             .delete()
-            .ilike('message', `%${normSlotCode}%`);
+            .or(`message.ilike.%${normSlotCode}%,message.ilike.%${params.location}%`);
         } catch {
           // ignore
         }

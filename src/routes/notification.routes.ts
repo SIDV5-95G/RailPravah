@@ -153,27 +153,60 @@ router.get('/', async (req: Request, res: Response) => {
     });
   }
 
-  // Deduplicate and combine by canonical slot key
-  const notifMap = new Map<string, any>();
-  for (const item of [...slotList, ...sysList] as any[]) {
-    const rawMsg = item.message || '';
-    const rawTitle = item.title || '';
-    const match =
+  // Helper to extract a canonical key for slot / complaint notifications
+  const getCanonicalKey = (item: any): string => {
+    const rawMsg = (item.message || '').trim();
+    const rawTitle = (item.title || '').trim();
+
+    // 1. Explicit slot code or ID from fields or regex
+    const slotCodeMatch =
       item.slotCode ||
       item.slot_code ||
+      item.slotId ||
       rawTitle.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0] ||
       rawMsg.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0];
 
-    const slotKey = match ? `slot_${match.toUpperCase()}` : `id_${item.id}`;
+    if (slotCodeMatch) {
+      return `slot_${slotCodeMatch.toUpperCase()}`;
+    }
 
-    if (notifMap.has(slotKey)) {
-      const existing = notifMap.get(slotKey)!;
-      // Prefer richer slotNotification payload
-      if (!existing.slotCode && item.slotCode) {
-        notifMap.set(slotKey, item);
+    // 2. Event signature: location + date + timing + workName
+    const locMatch = rawMsg.match(/for\s+(.*?)\s+on\s+(\d{4}-\d{2}-\d{2})/i) || rawTitle.match(/for\s+(.*?)\s+on\s+(\d{4}-\d{2}-\d{2})/i);
+    const timeMatch = rawMsg.match(/\((\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}[^)]*)\)/) || rawMsg.match(/(\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2})/);
+    const workMatch = rawMsg.match(/Work:\s*([^.]+)/i);
+
+    const loc = (locMatch ? locMatch[1] : (item.location || '')).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const dStr = (locMatch ? locMatch[2] : (item.date || '')).trim();
+    const tStr = (timeMatch ? timeMatch[1] : (item.timing || '')).trim().replace(/[^0-9]/g, '');
+    const wStr = (workMatch ? workMatch[1] : (item.workName || '')).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    if (loc || dStr || tStr) {
+      return `event_${loc}_${dStr}_${tStr}_${wStr}`;
+    }
+
+    // 3. Fallback: normalized title and message text prefix
+    const normTitle = rawTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normMsg = rawMsg.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 80);
+    if (normTitle || normMsg) {
+      return `msg_${normTitle}_${normMsg}`;
+    }
+
+    return `id_${item.id || randomUUID()}`;
+  };
+
+  // Deduplicate and combine by canonical key
+  const notifMap = new Map<string, any>();
+  for (const item of [...slotList, ...sysList] as any[]) {
+    const key = getCanonicalKey(item);
+
+    if (notifMap.has(key)) {
+      const existing = notifMap.get(key)!;
+      // Prefer richer slotNotification payload or newer createdAt
+      if ((!existing.slotCode && item.slotCode) || (!existing.workName && item.workName)) {
+        notifMap.set(key, { ...existing, ...item });
       }
     } else {
-      notifMap.set(slotKey, item);
+      notifMap.set(key, item);
     }
   }
 

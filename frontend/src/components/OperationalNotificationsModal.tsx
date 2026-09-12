@@ -32,21 +32,52 @@ export const OperationalNotificationsModal: React.FC<
   );
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Canonical deduplication by slot code
+  // Canonical deduplication by slot code or composite event signature
   const uniqueNotifications = React.useMemo(() => {
     const notifMap = new Map<string, PravahSlotNotification>();
     notifications.forEach((n) => {
-      const msg = n.message || "";
-      const title = n.title || "";
+      const msg = (n.message || "").trim();
+      const title = (n.title || "").trim();
       const match =
         n.slotCode ||
         (n as any).slot_code ||
+        (n as any).slotId ||
         title.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0] ||
         msg.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0];
 
-      const key = match ? `slot_${match.toUpperCase()}` : `id_${n.id}`;
+      let key = match ? `slot_${match.toUpperCase()}` : "";
+      if (!key) {
+        const locMatch = msg.match(/for\s+(.*?)\s+on\s+(\d{4}-\d{2}-\d{2})/i) || title.match(/for\s+(.*?)\s+on\s+(\d{4}-\d{2}-\d{2})/i);
+        const timeMatch = msg.match(/\((\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}[^)]*)\)/) || msg.match(/(\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2})/);
+        const workMatch = msg.match(/Work:\s*([^.]+)/i);
+
+        const loc = (locMatch ? locMatch[1] : (n.location || "")).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+        const dStr = (locMatch ? locMatch[2] : (n.date || "")).trim();
+        const tStr = (timeMatch ? timeMatch[1] : (n.timing || "")).trim().replace(/[^0-9]/g, "");
+        const wStr = (workMatch ? workMatch[1] : (n.workName || "")).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
+        if (loc || dStr || tStr) {
+          key = `event_${loc}_${dStr}_${tStr}_${wStr}`;
+        }
+      }
+      if (!key) {
+        const normTitle = title.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const normMsg = msg.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 80);
+        if (normTitle || normMsg) {
+          key = `msg_${normTitle}_${normMsg}`;
+        }
+      }
+      if (!key) {
+        key = `id_${n.id}`;
+      }
+
       if (!notifMap.has(key)) {
         notifMap.set(key, n);
+      } else {
+        const existing = notifMap.get(key)!;
+        if (!existing.slotCode && n.slotCode) {
+          notifMap.set(key, { ...existing, ...n });
+        }
       }
     });
     return Array.from(notifMap.values());

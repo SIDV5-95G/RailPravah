@@ -234,16 +234,36 @@ export const App: React.FC = () => {
         .then((r) => r.json())
         .then((data) => {
           if (data.success && Array.isArray(data.notifications)) {
-            const notifMap = new Map<string, PravahSlotNotification>();
-            data.notifications.forEach((n: PravahSlotNotification) => {
-              const msg = n.message || "";
-              const title = n.title || "";
+            const extractSlotKey = (n: PravahSlotNotification): string => {
+              const msg = (n.message || "").trim();
+              const title = (n.title || "").trim();
               const match =
                 n.slotCode ||
                 (n as any).slot_code ||
+                (n as any).slotId ||
                 title.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0] ||
                 msg.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0];
-              const key = match ? `slot_${match.toUpperCase()}` : `id_${n.id}`;
+              if (match) return `slot_${match.toUpperCase()}`;
+
+              const locMatch = msg.match(/for\s+(.*?)\s+on\s+(\d{4}-\d{2}-\d{2})/i) || title.match(/for\s+(.*?)\s+on\s+(\d{4}-\d{2}-\d{2})/i);
+              const timeMatch = msg.match(/\((\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}[^)]*)\)/) || msg.match(/(\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2})/);
+              const workMatch = msg.match(/Work:\s*([^.]+)/i);
+
+              const loc = (locMatch ? locMatch[1] : (n.location || "")).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+              const dStr = (locMatch ? locMatch[2] : (n.date || "")).trim();
+              const tStr = (timeMatch ? timeMatch[1] : (n.timing || "")).trim().replace(/[^0-9]/g, "");
+              const wStr = (workMatch ? workMatch[1] : (n.workName || "")).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
+              if (loc || dStr || tStr) return `event_${loc}_${dStr}_${tStr}_${wStr}`;
+              const normTitle = title.toLowerCase().replace(/[^a-z0-9]/g, "");
+              const normMsg = msg.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 80);
+              if (normTitle || normMsg) return `msg_${normTitle}_${normMsg}`;
+              return `id_${n.id}`;
+            };
+
+            const notifMap = new Map<string, PravahSlotNotification>();
+            data.notifications.forEach((n: PravahSlotNotification) => {
+              const key = extractSlotKey(n);
               if (!notifMap.has(key)) notifMap.set(key, n);
             });
             setOperationalNotifications(Array.from(notifMap.values()));
@@ -260,16 +280,36 @@ export const App: React.FC = () => {
       .then((fbNotifs) => {
         if (Array.isArray(fbNotifs) && fbNotifs.length > 0) {
           setOperationalNotifications((prev) => {
-            const notifMap = new Map<string, PravahSlotNotification>();
-            [...prev, ...fbNotifs].forEach((n) => {
-              const msg = n.message || "";
-              const title = n.title || "";
+            const extractSlotKey = (n: PravahSlotNotification): string => {
+              const msg = (n.message || "").trim();
+              const title = (n.title || "").trim();
               const match =
                 n.slotCode ||
                 (n as any).slot_code ||
+                (n as any).slotId ||
                 title.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0] ||
                 msg.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0];
-              const key = match ? `slot_${match.toUpperCase()}` : `id_${n.id}`;
+              if (match) return `slot_${match.toUpperCase()}`;
+
+              const locMatch = msg.match(/for\s+(.*?)\s+on\s+(\d{4}-\d{2}-\d{2})/i) || title.match(/for\s+(.*?)\s+on\s+(\d{4}-\d{2}-\d{2})/i);
+              const timeMatch = msg.match(/\((\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}[^)]*)\)/) || msg.match(/(\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2})/);
+              const workMatch = msg.match(/Work:\s*([^.]+)/i);
+
+              const loc = (locMatch ? locMatch[1] : (n.location || "")).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+              const dStr = (locMatch ? locMatch[2] : (n.date || "")).trim();
+              const tStr = (timeMatch ? timeMatch[1] : (n.timing || "")).trim().replace(/[^0-9]/g, "");
+              const wStr = (workMatch ? workMatch[1] : (n.workName || "")).trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
+              if (loc || dStr || tStr) return `event_${loc}_${dStr}_${tStr}_${wStr}`;
+              const normTitle = title.toLowerCase().replace(/[^a-z0-9]/g, "");
+              const normMsg = msg.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 80);
+              if (normTitle || normMsg) return `msg_${normTitle}_${normMsg}`;
+              return `id_${n.id}`;
+            };
+
+            const notifMap = new Map<string, PravahSlotNotification>();
+            [...prev, ...fbNotifs].forEach((n) => {
+              const key = extractSlotKey(n);
               if (!notifMap.has(key)) notifMap.set(key, n);
             });
             return Array.from(notifMap.values());
