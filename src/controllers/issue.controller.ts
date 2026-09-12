@@ -63,6 +63,14 @@ async function syncIssueToSupabase(
       null;
 
     const priorityStr = issue.activeRequest?.priority || 'High';
+    const normUrgency =
+      priorityStr.toLowerCase() === 'emergency'
+        ? 'emergency'
+        : priorityStr.toLowerCase() === 'high'
+        ? 'high'
+        : priorityStr.toLowerCase() === 'low'
+        ? 'low'
+        : 'medium';
     const estTimeStr = issue.activeRequest?.estimatedFixTimeMinutes ? `${issue.activeRequest.estimatedFixTimeMinutes}m` : '45m';
 
     if (action === 'created') {
@@ -85,6 +93,7 @@ async function syncIssueToSupabase(
         department: dept as any,
         description: `[${issue.activeRequest.title}]: ${issue.activeRequest.description} (Station: ${issue.station}, Track: ${issue.activeRequest.trackSection}, Post: ${issue.activeRequest.nearestKmPost}, Line: ${issue.activeRequest.lineType}, Priority: ${priorityStr}, EstTime: ${estTimeStr})`,
         photo_url: photoUrl,
+        urgency: normUrgency,
         status: status as any,
         current_assignee: supervisorId,
         created_at: new Date().toISOString(),
@@ -136,6 +145,7 @@ async function syncIssueToSupabase(
           .trim();
         const updatePayload: any = {
           status: status as any,
+          urgency: normUrgency,
           description: `[${issue.activeRequest.title}]: ${cleanDescForDb} (Station: ${issue.station}, Track: ${issue.activeRequest.trackSection}, Post: ${issue.activeRequest.nearestKmPost}, Line: ${issue.activeRequest.lineType}, Priority: ${priorityStr}, EstTime: ${estTimeStr})`,
           updated_at: new Date().toISOString(),
         };
@@ -363,17 +373,28 @@ async function loadComplaintsFromSupabase(): Promise<void> {
       const dynamicTrack = trackMatch ? trackMatch[1].trim() : 'DR – GC';
       const dynamicPost = postMatch ? postMatch[1].trim() : 'Km 10/4';
       const dynamicLine = (lineMatch ? lineMatch[1].trim() : 'Down Slow') as any;
-      const dynamicPriority = (priorityMatch
-        ? priorityMatch[1].trim()
-        : c.urgency
-        ? c.urgency === 'emergency'
-          ? 'Emergency'
-          : c.urgency === 'high'
-          ? 'High'
-          : c.urgency === 'low'
-          ? 'Low'
-          : 'Medium'
-        : 'High') as PriorityType;
+      let dynamicPriority: PriorityType = 'Medium';
+      if (priorityMatch) {
+        const p = priorityMatch[1].trim().toLowerCase();
+        dynamicPriority = p === 'emergency' ? 'Emergency' : p === 'high' ? 'High' : p === 'low' ? 'Low' : 'Medium';
+      } else if (c.urgency) {
+        const u = c.urgency.toLowerCase();
+        dynamicPriority = u === 'emergency' ? 'Emergency' : u === 'high' ? 'High' : u === 'low' ? 'Low' : 'Medium';
+      } else {
+        dynamicPriority = 'High';
+      }
+
+      // Reconcile database table urgency column if it diverged
+      const expectedUrgency = dynamicPriority.toLowerCase();
+      if (c.urgency !== expectedUrgency && isSupabaseConfigured() && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.id)) {
+        supabaseAdmin
+          .from('complaints')
+          .update({ urgency: expectedUrgency })
+          .eq('id', c.id)
+          .then(({ error }: any) => {
+            if (error) console.warn('Note reconciling complaint urgency:', error.message);
+          });
+      }
       const dynamicEstTime = estTimeMatch ? parseInt(estTimeMatch[1].replace(/\D/g, '')) || 45 : 45;
 
       // Clean description by stripping (Station: ... ) trailer
@@ -757,6 +778,12 @@ export const escalateIssue = async (req: Request, res: Response): Promise<void> 
   const effectiveRole = (req.headers['x-user-role'] || userRole || '') as string;
   const userDept = (req.headers['x-user-dept'] || req.body.department || '') as string;
   const userEmpId = (req.headers['x-user-empid'] || modifiedBy?.empId || '') as string;
+
+  if (req.body.priority) {
+    issue.activeRequest.priority = req.body.priority;
+  } else if (req.body.activeRequest?.priority) {
+    issue.activeRequest.priority = req.body.activeRequest.priority;
+  }
 
   if (effectiveRole && !canUserViewIssue(issue, effectiveRole, userEmpId, userDept)) {
     res.status(403).json({ success: false, error: 'Access Denied: You cannot escalate issues belonging to another department.' });
