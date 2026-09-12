@@ -214,10 +214,10 @@ export const EditIssueModal: React.FC<EditIssueModalProps> = ({
                 onChange={(e) => setPriority(e.target.value as PriorityType)}
                 className="w-full bg-[#f8f9fa] border border-[#c7c4d8] rounded-lg px-3 py-2 text-xs text-[#191c1e] focus:outline-none focus:border-[#3525cd] focus:bg-white font-semibold"
               >
-                <option value="Emergency">🚨 Emergency (Immediate block required)</option>
-                <option value="High">⚠️ High (Next 12 hours)</option>
-                <option value="Medium">⚡ Medium (Next 24 hours)</option>
-                <option value="Low">ℹ️ Low (Routine)</option>
+                <option value="Emergency">🚨 Emergency</option>
+                <option value="High">⚠️ High</option>
+                <option value="Medium">⚡ Medium</option>
+                <option value="Low">ℹ️ Low</option>
               </select>
             </div>
             <div>
