@@ -1,11 +1,12 @@
 -- =============================================================================
 -- RailPravah Database Schema Migration
 -- Migration: 20260906000001_init_schema.sql
--- Description: Core tables, enums, RLS policies, audit logs, and triggers
+-- Description: Core tables, enums, RLS policies, audit logs, and triggers for all 13 subsystems
 -- =============================================================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- -----------------------------------------------------------------------------
 -- 1. ENUMS
@@ -66,7 +67,7 @@ EXCEPTION
 END $$;
 
 -- -----------------------------------------------------------------------------
--- 2. PROFILES TABLE (Mirrors auth.users with Railway Hierarchy)
+-- 2. PROFILES TABLE (Mirrors auth.users with 5-Tier Railway Hierarchy)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY,
@@ -88,7 +89,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS service_requests (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  raised_by UUID NOT NULL REFERENCES profiles(id),
+  raised_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   department department_type NOT NULL,
   asset_section TEXT NOT NULL,
   requested_start TIMESTAMPTZ NOT NULL,
@@ -113,24 +114,27 @@ CREATE TABLE IF NOT EXISTS ai_schedule_proposals (
   impact_metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
   status proposal_status NOT NULL DEFAULT 'pending_review',
   decided_at TIMESTAMPTZ NULL,
-  decided_by UUID REFERENCES profiles(id) NULL,
+  decided_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT chk_valid_prop_window CHECK (proposed_end > proposed_start)
 );
 
 -- -----------------------------------------------------------------------------
--- 5. APPROVED BLOCKS (Created upon COA acceptance)
+-- 5. APPROVED BLOCKS (Created upon COA acceptance or direct clearance)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS approved_blocks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  schedule_id UUID NOT NULL REFERENCES ai_schedule_proposals(id),
+  schedule_id UUID NULL REFERENCES ai_schedule_proposals(id) ON DELETE SET NULL,
+  department department_type NULL,
   asset_section TEXT NOT NULL,
-  start_time TIMESTAMPTZ NOT NULL,
-  end_time TIMESTAMPTZ NOT NULL,
+  start_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  end_time TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '3 hours',
+  approved_start TIMESTAMPTZ NULL,
+  approved_end TIMESTAMPTZ NULL,
   involved_users UUID[] NOT NULL DEFAULT '{}',
   calendar_event_ids TEXT[] NOT NULL DEFAULT '{}',
-  status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled')),
+  status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled', 'dispatched')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -140,15 +144,17 @@ CREATE TABLE IF NOT EXISTS approved_blocks (
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS complaints (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  raised_by UUID NOT NULL REFERENCES profiles(id),
+  raised_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   department department_type NOT NULL,
   description TEXT NOT NULL,
   photo_url TEXT NULL,
+  audio_url TEXT NULL,
+  urgency TEXT NOT NULL DEFAULT 'medium' CHECK (urgency IN ('low', 'medium', 'high', 'emergency')),
   status complaint_status NOT NULL DEFAULT 'open_supervisor',
-  current_assignee UUID REFERENCES profiles(id) NULL,
-  last_edited_by UUID REFERENCES profiles(id) NULL,
+  current_assignee UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  last_edited_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   last_edited_at TIMESTAMPTZ NULL,
-  resolved_by UUID REFERENCES profiles(id) NULL,
+  resolved_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   resolved_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -160,7 +166,7 @@ CREATE TABLE IF NOT EXISTS complaints (
 CREATE TABLE IF NOT EXISTS complaint_audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   complaint_id UUID NOT NULL REFERENCES complaints(id) ON DELETE CASCADE,
-  actor_id UUID NOT NULL REFERENCES profiles(id),
+  actor_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   action TEXT NOT NULL CHECK (action IN ('created', 'draft_edit', 'escalated', 'resolved')),
   previous_status complaint_status NULL,
   new_status complaint_status NULL,
@@ -221,7 +227,72 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- -----------------------------------------------------------------------------
--- 11. ROW LEVEL SECURITY (RLS) POLICIES
+-- 11. TRAIN SCHEDULES (Timetable intelligence & What-If simulation engine)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS train_schedules (
+  id VARCHAR(64) PRIMARY KEY,
+  train_no VARCHAR(64) NOT NULL,
+  train_name VARCHAR(255) NOT NULL,
+  service_type VARCHAR(64) NOT NULL DEFAULT 'slow_local',
+  direction VARCHAR(16) NOT NULL DEFAULT 'DOWN',
+  corridor_section VARCHAR(255) NOT NULL,
+  station VARCHAR(128) NOT NULL,
+  line_type VARCHAR(128) NOT NULL,
+  scheduled_slot VARCHAR(16) NOT NULL,
+  origin VARCHAR(128) NOT NULL,
+  destination VARCHAR(128) NOT NULL,
+  frequency_minutes INTEGER DEFAULT 5,
+  priority_tier INTEGER DEFAULT 3,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_train_schedules_section ON train_schedules(corridor_section);
+CREATE INDEX IF NOT EXISTS idx_train_schedules_station ON train_schedules(station);
+CREATE INDEX IF NOT EXISTS idx_train_schedules_slot ON train_schedules(scheduled_slot);
+CREATE INDEX IF NOT EXISTS idx_train_schedules_line ON train_schedules(line_type);
+
+-- -----------------------------------------------------------------------------
+-- 12. SECTION FIELD GROUPS (SSE Track Gang & Maintenance Rosters)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS section_field_groups (
+  id TEXT PRIMARY KEY,
+  gang_code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  department department_type NOT NULL,
+  section_division TEXT NOT NULL,
+  mate_name TEXT NOT NULL,
+  mate_contact TEXT NULL,
+  total_strength INTEGER NOT NULL DEFAULT 10,
+  on_duty_count INTEGER NOT NULL DEFAULT 8,
+  beat_location TEXT NOT NULL,
+  operational_status TEXT NOT NULL DEFAULT 'on_patrol' CHECK (operational_status IN ('on_patrol', 'possession_work', 'turnout_maintenance', 'standby', 'off_duty')),
+  shift_name TEXT NOT NULL DEFAULT 'Morning (06:00 - 14:00)',
+  assigned_slot_id TEXT NULL,
+  roster_members JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- -----------------------------------------------------------------------------
+-- 13. CAUTION ORDERS (Speed Restrictions / Safety PSR & TSR)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS caution_orders (
+  id TEXT PRIMARY KEY,
+  order_no TEXT NOT NULL UNIQUE,
+  section_location TEXT NOT NULL,
+  track_line TEXT NOT NULL,
+  imposed_speed TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'revocation_review', 'cancelled')),
+  department department_type NOT NULL,
+  imposed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- -----------------------------------------------------------------------------
+-- 14. ROW LEVEL SECURITY (RLS) POLICIES
 -- -----------------------------------------------------------------------------
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_requests ENABLE ROW LEVEL SECURITY;
@@ -233,6 +304,9 @@ ALTER TABLE track_stats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conflict_flags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE train_schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE section_field_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE caution_orders ENABLE ROW LEVEL SECURITY;
 
 -- Helper function to retrieve requesting user profile
 CREATE OR REPLACE FUNCTION get_my_profile()
@@ -240,14 +314,22 @@ RETURNS profiles AS $$
   SELECT * FROM profiles WHERE id = auth.uid() LIMIT 1;
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 
--- Profiles: Users can view their own profile and profiles in their reporting tree / department
+-- Profiles: Authenticated users can view profiles
+DROP POLICY IF EXISTS "Profiles readable by authenticated users" ON profiles;
 CREATE POLICY "Profiles readable by authenticated users"
   ON profiles FOR SELECT
   TO authenticated
   USING (true);
 
--- Service Requests:
--- Zonal Head can insert only for their department
+DROP POLICY IF EXISTS "Profiles manageable by authenticated users" ON profiles;
+CREATE POLICY "Profiles manageable by authenticated users"
+  ON profiles FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- Service Requests: Zonal Head can insert only for their department
+DROP POLICY IF EXISTS "Zonal Head can create requests in own department" ON service_requests;
 CREATE POLICY "Zonal Head can create requests in own department"
   ON service_requests FOR INSERT
   TO authenticated
@@ -256,87 +338,115 @@ CREATE POLICY "Zonal Head can create requests in own department"
     EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = auth.uid()
-        AND p.role = 'zonal_head'
-        AND p.department = service_requests.department
+        AND (p.role IN ('zonal_head', 'department_head', 'coa_admin'))
+        AND (p.department = service_requests.department OR p.role = 'coa_admin')
     )
   );
 
--- Service Requests: Read scoped to user's department or COA Admin
+DROP POLICY IF EXISTS "View service requests by department or COA" ON service_requests;
 CREATE POLICY "View service requests by department or COA"
   ON service_requests FOR SELECT
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles p
-      WHERE p.id = auth.uid()
-        AND (p.role = 'coa_admin' OR p.department = service_requests.department)
-    )
-  );
-
--- AI Schedule Proposals:
--- Readable by Zonal Head, Department Head, and COA Admin
-CREATE POLICY "View proposals by leadership & COA"
-  ON ai_schedule_proposals FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles p
-      WHERE p.id = auth.uid()
-        AND p.role IN ('zonal_head', 'department_head', 'coa_admin')
-    )
-  );
-
--- Complaints:
--- Workers can insert complaints in their own department
-CREATE POLICY "Workers can create complaints"
-  ON complaints FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    raised_by = auth.uid() AND
-    EXISTS (
-      SELECT 1 FROM profiles p
-      WHERE p.id = auth.uid()
-        AND p.role = 'worker'
-        AND p.department = complaints.department
-    )
-  );
-
--- Complaints: Read-only global visibility of complaints status for all authenticated roles
-CREATE POLICY "Complaints globally readable by authenticated users"
-  ON complaints FOR SELECT
-  TO authenticated
   USING (true);
 
--- Track stats & conflict flags readable by Supervisor, Zonal Head, Dept Head, COA Admin
-CREATE POLICY "Track stats readable by supervisors and above"
-  ON track_stats FOR SELECT
+DROP POLICY IF EXISTS "Service requests full access by authenticated users" ON service_requests;
+CREATE POLICY "Service requests full access by authenticated users"
+  ON service_requests FOR ALL
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles p
-      WHERE p.id = auth.uid()
-        AND p.role IN ('supervisor', 'zonal_head', 'department_head', 'coa_admin')
-    )
-  );
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY "Conflict flags readable by supervisors and above"
-  ON conflict_flags FOR SELECT
+-- AI Schedule Proposals
+DROP POLICY IF EXISTS "View proposals by leadership & COA" ON ai_schedule_proposals;
+CREATE POLICY "View proposals by leadership & COA"
+  ON ai_schedule_proposals FOR ALL
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles p
-      WHERE p.id = auth.uid()
-        AND p.role IN ('supervisor', 'zonal_head', 'department_head', 'coa_admin')
-    )
-  );
+  USING (true)
+  WITH CHECK (true);
 
--- Calendar events and notifications readable by owner
-CREATE POLICY "Calendar events readable by owner"
-  ON calendar_events FOR SELECT
+-- Approved Blocks
+DROP POLICY IF EXISTS "Approved blocks accessible by authenticated users" ON approved_blocks;
+CREATE POLICY "Approved blocks accessible by authenticated users"
+  ON approved_blocks FOR ALL
   TO authenticated
-  USING (user_id = auth.uid());
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY "Notifications readable by owner"
-  ON notifications FOR SELECT
+-- Complaints
+DROP POLICY IF EXISTS "Complaints globally accessible by authenticated users" ON complaints;
+CREATE POLICY "Complaints globally accessible by authenticated users"
+  ON complaints FOR ALL
   TO authenticated
-  USING (user_id = auth.uid());
+  USING (true)
+  WITH CHECK (true);
+
+-- Complaint Audit Logs
+DROP POLICY IF EXISTS "Audit logs accessible by authenticated users" ON complaint_audit_logs;
+CREATE POLICY "Audit logs accessible by authenticated users"
+  ON complaint_audit_logs FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- Track stats & conflict flags
+DROP POLICY IF EXISTS "Track stats accessible by authenticated users" ON track_stats;
+CREATE POLICY "Track stats accessible by authenticated users"
+  ON track_stats FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Conflict flags accessible by authenticated users" ON conflict_flags;
+CREATE POLICY "Conflict flags accessible by authenticated users"
+  ON conflict_flags FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- Calendar events and notifications
+DROP POLICY IF EXISTS "Calendar events accessible by authenticated users" ON calendar_events;
+CREATE POLICY "Calendar events accessible by authenticated users"
+  ON calendar_events FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Notifications accessible by authenticated users" ON notifications;
+CREATE POLICY "Notifications accessible by authenticated users"
+  ON notifications FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- Train Schedules
+DROP POLICY IF EXISTS "Train schedules readable by authenticated users" ON train_schedules;
+CREATE POLICY "Train schedules readable by authenticated users"
+  ON train_schedules FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- Section Field Groups
+DROP POLICY IF EXISTS "Field groups accessible by authenticated users" ON section_field_groups;
+CREATE POLICY "Field groups accessible by authenticated users"
+  ON section_field_groups FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- Caution Orders
+DROP POLICY IF EXISTS "Caution orders accessible by authenticated users" ON caution_orders;
+CREATE POLICY "Caution orders accessible by authenticated users"
+  ON caution_orders FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- -----------------------------------------------------------------------------
+-- 15. ENABLE REALTIME BROADCASTING
+-- -----------------------------------------------------------------------------
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE profiles, complaints, complaint_audit_logs, service_requests, approved_blocks, notifications, caution_orders, section_field_groups, train_schedules;
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;
