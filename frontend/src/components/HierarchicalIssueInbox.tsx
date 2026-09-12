@@ -100,6 +100,15 @@ export const HierarchicalIssueInbox: React.FC<HierarchicalIssueInboxProps> = ({
 
   useEffect(() => {
     fetchIssues();
+    const handleIssuesUpdated = () => {
+      fetchIssues();
+    };
+    window.addEventListener("railpravah:issues-updated", handleIssuesUpdated);
+    const interval = setInterval(fetchIssues, 4000);
+    return () => {
+      window.removeEventListener("railpravah:issues-updated", handleIssuesUpdated);
+      clearInterval(interval);
+    };
   }, [user.userRole, user.empId, user.department]);
 
   // Handle Edit Save
@@ -409,12 +418,32 @@ export const HierarchicalIssueInbox: React.FC<HierarchicalIssueInboxProps> = ({
 
     if (!matchSearch) return false;
 
-    if (statusFilter === "pending") {
-      return isActionRequiredAtCurrentLevel(i, user.userRole, user.empId);
+    const isResolvedOrSanctioned =
+      i.currentStatus.startsWith("Resolved") ||
+      i.currentStatus === "Sanctioned by COA" ||
+      i.currentStatus === "Resolved / Closed";
+
+    if (mode === "complaints") {
+      if (statusFilter === "resolved") {
+        return isResolvedAtCurrentLevel(i, user.userRole, user.empId);
+      }
+      if (statusFilter === "pending") {
+        return isActionRequiredAtCurrentLevel(i, user.userRole, user.empId);
+      }
+      // By default in complaints inbox mode, remove already scheduled/resolved complaints
+      return !isResolvedOrSanctioned;
     }
-    if (statusFilter === "resolved") {
-      return isResolvedAtCurrentLevel(i, user.userRole, user.empId);
+
+    if (mode === "status") {
+      if (statusFilter === "pending") {
+        return isActionRequiredAtCurrentLevel(i, user.userRole, user.empId);
+      }
+      if (statusFilter === "resolved") {
+        return isResolvedAtCurrentLevel(i, user.userRole, user.empId);
+      }
+      return true;
     }
+
     return true;
   });
 

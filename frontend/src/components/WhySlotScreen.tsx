@@ -105,6 +105,7 @@ export const WhySlotScreen: React.FC<WhySlotScreenProps> = ({
         prev.map((s) => (s.id === slot.id ? { ...s, status: "approved" as const } : s))
       );
       onApproveSlot(slot.slotCode, data.calendarBlock);
+      window.dispatchEvent(new CustomEvent("railpravah:issues-updated"));
       setActionFeedback(
         slot.isCluster
           ? `Clustered Task ${slot.slotCode} (${slot.departmentLabel}) has been APPROVED and scheduled in timetable.`

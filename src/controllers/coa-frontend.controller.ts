@@ -1420,12 +1420,95 @@ export const approveWhySlotProposal = async (req: Request, res: Response): Promi
         }
       }
 
-      // NOTE: As requested by user, complaints are NOT auto-closed on slot approval.
-      // Complaints remain active until the officer explicitly presses the Close Complaint action.
+      // 3. Mark linked complaints as resolved & closed upon successful slot approval and timetable scheduling
+      if (allLinkedIds.length > 0) {
+        try {
+          const actorEmpId = (req.headers['x-user-empid'] as string) || '';
+          const actorRole = (req.headers['x-user-role'] as string) || 'department_head';
+          const actorName = (req.headers['x-user-name'] as string) || (actorRole === 'department_head' ? 'Sr. Divisional Engineer' : actorRole === 'zonal_head' ? 'Chief Track Engineer' : 'COA Master Controller');
+          const validActorId = await getValidProfileId(actorEmpId, {
+            name: actorName,
+            role: actorRole as any,
+            department: newCalBlock.department,
+          });
+
+          // Mark complaint status closed in database
+          await supabaseAdmin
+            .from('complaints')
+            .update({
+              status: 'closed',
+              resolved_at: new Date().toISOString(),
+              resolved_by: validActorId,
+            } as any)
+            .in('id', allLinkedIds);
+
+          // Add complaint resolution audit log
+          for (const cId of allLinkedIds) {
+            try {
+              await supabaseAdmin.from('complaint_audit_logs').insert({
+                complaint_id: cId,
+                actor_id: validActorId,
+                action: 'resolved',
+                notes: `Resolved & Sanctioned via WhySlot AI Slot: ${slotCode || id} scheduled on ${targetDate} (${startTime} – ${endTime} IST)`,
+              } as any);
+            } catch (auditErr) {
+              console.warn('Note inserting audit log on slot approve:', auditErr);
+            }
+          }
+        } catch (compErr) {
+          console.warn('Supabase mark complaints resolved note:', compErr);
+        }
+      }
     } catch (dbErr) {
       console.warn('Supabase approve why slot note:', dbErr);
     }
   }
+
+  // Update in-memory hierarchical issues and complaints
+  const allLinkedIds = complaintIds && Array.isArray(complaintIds) && complaintIds.length > 0
+    ? complaintIds
+    : (complaintId ? [complaintId] : (id.startsWith('whyslot-') ? [id.replace('whyslot-', '')] : []));
+  const linkedIdSet = new Set(allLinkedIds);
+  const nowStr = new Date().toISOString().substring(0, 16).replace('T', ' ');
+
+  coaFrontendStore.hierarchicalIssues.forEach((issue) => {
+    if (
+      linkedIdSet.has(issue.id) ||
+      linkedIdSet.has(issue.ticketNo) ||
+      (issue.station && location && location.toLowerCase().includes(issue.station.toLowerCase()) && !issue.currentStatus.startsWith('Resolved') && issue.currentStatus !== 'Sanctioned by COA')
+    ) {
+      issue.currentStatus = 'Sanctioned by COA';
+      issue.resolvedAt = nowStr;
+      issue.resolvedBy = {
+        name: (req.headers['x-user-name'] as string) || 'COA Master Controller',
+        empId: (req.headers['x-user-empid'] as string) || 'COA-001',
+        level: 'COA Management',
+      };
+      issue.resolutionDetails = `Sanctioned & Scheduled in Central Railway Timetable via WhySlot AI Slot ${slotCode || id} on ${targetDate} (${startTime} – ${endTime} IST)`;
+      issue.modificationHistory.push({
+        id: `mod-${Date.now()}-${issue.id.substring(0, 4)}`,
+        level: 'COA Management',
+        modifiedBy: {
+          name: (req.headers['x-user-name'] as string) || 'COA Master Controller',
+          empId: (req.headers['x-user-empid'] as string) || 'COA-001',
+          role: (req.headers['x-user-role'] as string) || 'coa_admin',
+        },
+        dateTime: nowStr,
+        changes: `Scheduled & Sanctioned via WhySlot AI Slot ${slotCode || id}`,
+        remarks: newCalBlock.description,
+        actionTaken: `Possession approved for ${targetDate} (${startTime} – ${endTime} IST)`,
+      });
+      issue.updatedAt = nowStr;
+    }
+  });
+
+  allLinkedIds.forEach((cId) => {
+    const memC = inMemoryStore.complaints.get(cId);
+    if (memC) {
+      memC.status = 'closed';
+      memC.resolved_at = new Date().toISOString();
+    }
+  });
 
   // Deduplicate in-memory calendar blocks before unshifting
   coaFrontendStore.calendarBlocks = coaFrontendStore.calendarBlocks.filter(
