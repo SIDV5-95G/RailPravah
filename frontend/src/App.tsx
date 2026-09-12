@@ -717,7 +717,16 @@ export const App: React.FC = () => {
       prev.map((s) => (s.slotCode === slotCode ? { ...s, status: "approved" } : s))
     );
     if (newBlock) {
-      setCalendarBlocks((prev) => [newBlock, ...prev.filter((b) => b.id !== newBlock.id)]);
+      setCalendarBlocks((prev) => [
+        newBlock,
+        ...prev.filter(
+          (b) =>
+            b.id !== newBlock.id &&
+            (b as any).slotCode !== (newBlock as any).slotCode &&
+            (b as any).slotCode !== slotCode &&
+            !(b.station === newBlock.station && b.date === newBlock.date && b.startTime === newBlock.startTime)
+        ),
+      ]);
     }
     fetch("/api/coa/calendar")
       .then((r) => r.json())

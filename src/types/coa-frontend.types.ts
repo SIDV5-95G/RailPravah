@@ -36,8 +36,16 @@ export interface CoaCalendarBlock {
   priority: 'Low' | 'Medium' | 'High' | 'Emergency' | 'Critical';
   status: 'approved' | 'pending' | 'conflict' | 'emergency';
   description: string;
+  slotCode?: string;
   clusterId?: string;
   isClustered?: boolean;
+  isCluster?: boolean;
+  departments?: string[];
+  taskName?: string;
+  machineryGangs?: string;
+  cautionOrder?: string;
+  timeSlot?: string;
+  periodLabel?: string;
   trainsAffected?: number;
 }
 

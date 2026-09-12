@@ -342,16 +342,30 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
 
       if (dbBlocks && dbBlocks.length > 0) {
         for (const b of dbBlocks as any[]) {
-          const exists = coaFrontendStore.calendarBlocks.find((c) => c.id === b.id);
           const startIst = parseIsoToIst(b.start_time, undefined, '14:00');
           const endIst = parseIsoToIst(b.end_time, undefined, '16:30');
           const startTime = startIst.timeStr;
           const endTime = endIst.timeStr;
           const dateStr = startIst.dateStr;
-          const title = b.proposal?.why_this_slot_explanation
+          const description = b.proposal?.why_this_slot_explanation || `Approved maintenance possession on ${b.asset_section}`;
+
+          // Extract clean slotCode from explanation (e.g. SLOT-993B or CLUSTER-CR-992)
+          let cleanSlotCode = '';
+          const slotMatch = description.match(/(SLOT-[A-Z0-9\-]+)/i);
+          const clusterMatch = description.match(/(CLUSTER-[A-Z0-9\-]+)/i);
+          if (slotMatch && slotMatch[1]) {
+            cleanSlotCode = slotMatch[1].toUpperCase();
+          } else if (clusterMatch && clusterMatch[1]) {
+            cleanSlotCode = clusterMatch[1].toUpperCase();
+          }
+
+          let title = b.proposal?.why_this_slot_explanation
             ? b.proposal.why_this_slot_explanation.split('.')[0]?.trim() || `Possession: ${b.asset_section}`
             : (b.asset_section ? `Possession: ${b.asset_section}` : 'Approved Corridor Block');
-          const description = b.proposal?.why_this_slot_explanation || `Approved maintenance possession on ${b.asset_section}`;
+
+          if (cleanSlotCode && b.asset_section) {
+            title = `AI Slot ${cleanSlotCode}: ${b.asset_section}`;
+          }
 
           const descLower = description.toLowerCase();
           const titleLower = title.toLowerCase();
@@ -362,6 +376,10 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
             titleLower.includes('joint') ||
             title.includes('+') ||
             descLower.includes('+');
+
+          if (isCluster && cleanSlotCode) {
+            title = `[CLUSTER] Joint Possession: ${cleanSlotCode} (${b.asset_section || 'Central Line'})`;
+          }
 
           let dept = 'Engineering Department';
           if ((descLower.includes('p-way') || titleLower.includes('p-way')) && (descLower.includes('trd') || descLower.includes('ohe') || titleLower.includes('trd') || titleLower.includes('ohe'))) {
@@ -376,8 +394,16 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
             dept = 'P-WAY';
           }
 
+          // Check if an in-memory block matches by ID, by cleanSlotCode, or by station + date + time
+          const matchIndex = coaFrontendStore.calendarBlocks.findIndex(
+            (c) => c.id === b.id ||
+                   (cleanSlotCode && (c as any).slotCode === cleanSlotCode) ||
+                   (c.station === (b.asset_section || 'Central Line') && c.startTime === startTime && c.endTime === endTime && c.date === dateStr)
+          );
+
           const blockItem = {
             id: b.id,
+            slotCode: cleanSlotCode || (matchIndex >= 0 ? (coaFrontendStore.calendarBlocks[matchIndex] as any).slotCode : undefined),
             title,
             station: b.asset_section || 'Central Line',
             department: dept,
@@ -397,10 +423,14 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
             timeSlot: `${startTime} – ${endTime} IST`,
           };
 
-          if (!exists) {
-            coaFrontendStore.calendarBlocks.push(blockItem);
+          if (matchIndex >= 0) {
+            coaFrontendStore.calendarBlocks[matchIndex] = {
+              ...coaFrontendStore.calendarBlocks[matchIndex],
+              ...blockItem,
+              slotCode: cleanSlotCode || (coaFrontendStore.calendarBlocks[matchIndex] as any).slotCode || blockItem.slotCode,
+            };
           } else {
-            Object.assign(exists, blockItem);
+            coaFrontendStore.calendarBlocks.push(blockItem);
           }
         }
       }
@@ -1348,8 +1378,6 @@ export const approveWhySlotProposal = async (req: Request, res: Response): Promi
     slotCode: slotCode || `SLOT-${id}`,
   };
 
-  coaFrontendStore.calendarBlocks.unshift(newCalBlock);
-
   // Sync to database with explicit Indian Standard Time (IST, UTC+05:30)
   if (isSupabaseConfigured()) {
     try {
@@ -1375,13 +1403,21 @@ export const approveWhySlotProposal = async (req: Request, res: Response): Promi
 
       // 2. Insert into approved_blocks with schedule_id and status 'scheduled'
       if (propData) {
-        await supabaseAdmin.from('approved_blocks').insert({
-          schedule_id: propData.id,
-          asset_section: location || 'Central Line',
-          start_time: startDateTime,
-          end_time: endDateTime,
-          status: 'scheduled',
-        } as any);
+        const { data: blockData } = await supabaseAdmin
+          .from('approved_blocks')
+          .insert({
+            schedule_id: propData.id,
+            asset_section: location || 'Central Line',
+            start_time: startDateTime,
+            end_time: endDateTime,
+            status: 'scheduled',
+          } as any)
+          .select()
+          .single();
+
+        if (blockData && blockData.id) {
+          newCalBlock.id = blockData.id;
+        }
       }
 
       // NOTE: As requested by user, complaints are NOT auto-closed on slot approval.
@@ -1390,6 +1426,14 @@ export const approveWhySlotProposal = async (req: Request, res: Response): Promi
       console.warn('Supabase approve why slot note:', dbErr);
     }
   }
+
+  // Deduplicate in-memory calendar blocks before unshifting
+  coaFrontendStore.calendarBlocks = coaFrontendStore.calendarBlocks.filter(
+    (b) => b.id !== newCalBlock.id &&
+           (!newCalBlock.slotCode || (b as any).slotCode !== newCalBlock.slotCode) &&
+           !(b.station === newCalBlock.station && b.date === newCalBlock.date && b.startTime === newCalBlock.startTime)
+  );
+  coaFrontendStore.calendarBlocks.unshift(newCalBlock);
 
   // Broadcast slot approval notification to worker, supervisor, zonal head, dept head, and coa
   const actorRole = (req.headers['x-user-role'] as string) || 'department_head';

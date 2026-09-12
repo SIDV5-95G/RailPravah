@@ -178,13 +178,40 @@ export const UnifiedDailyScheduleCalendar: React.FC<UnifiedDailyScheduleCalendar
     return () => clearInterval(interval);
   }, [currentYear, currentMonth]);
 
-  // Combine parent-provided blocks and live database fetched blocks
+  // Combine parent-provided blocks and live database fetched blocks with robust deduplication
   const effectiveCalendarBlocks = useMemo(() => {
     const blockMap = new Map<string, CalendarBlock>();
-    if (calendarBlocks && Array.isArray(calendarBlocks)) {
-      calendarBlocks.forEach((b) => blockMap.set(b.id, b));
-    }
-    fetchedBlocks.forEach((b) => blockMap.set(b.id, b));
+    const all = [
+      ...(calendarBlocks && Array.isArray(calendarBlocks) ? calendarBlocks : []),
+      ...fetchedBlocks,
+    ];
+
+    all.forEach((b) => {
+      // Determine canonical key
+      const descSlot = b.description?.match(/(SLOT-[A-Z0-9\-]+|CLUSTER-[A-Z0-9\-]+)/i)?.[0];
+      const slotCode = (b as any).slotCode || descSlot || '';
+      const normSlot = slotCode.toUpperCase().trim();
+
+      let key = b.id;
+      if (normSlot && normSlot !== 'SLOT-' && !normSlot.startsWith('SLOT-PRV-')) {
+        key = `slot_${normSlot}_${b.date || ''}`;
+      } else if (b.station && b.date && b.startTime) {
+        key = `loc_${b.station}_${b.date}_${b.startTime}_${b.endTime || ''}`;
+      }
+
+      if (blockMap.has(key)) {
+        const existing = blockMap.get(key)!;
+        const existingSlot = (existing as any).slotCode;
+        const newSlot = (b as any).slotCode;
+        // Keep the one with explicit slotCode or richer metadata
+        if (!existingSlot && newSlot) {
+          blockMap.set(key, b);
+        }
+      } else {
+        blockMap.set(key, b);
+      }
+    });
+
     return Array.from(blockMap.values());
   }, [calendarBlocks, fetchedBlocks]);
 
@@ -236,10 +263,12 @@ export const UnifiedDailyScheduleCalendar: React.FC<UnifiedDailyScheduleCalendar
             const taskTitle = (b as any).taskName || b.title;
             const taskDesc = b.description || taskTitle;
             const durHours = getDurationHours(b.startTime, b.endTime);
+            const rawSlotCode = (b as any).slotCode || b.description?.match(/(SLOT-[A-Z0-9\-]+|CLUSTER-[A-Z0-9\-]+)/i)?.[0];
+            const cleanSlotCode = b.clusterId ? `BLK-CR-${b.clusterId}` : (rawSlotCode || `SLOT-PRV-${b.id.substring(0, 8)}`);
 
             return {
               id: `block-${b.id}-${idx}`,
-              slotCode: b.clusterId ? `BLK-CR-${b.clusterId}` : (b as any).slotCode || `SLOT-PRV-${b.id}`,
+              slotCode: cleanSlotCode,
               timeSlot: `${b.startTime} – ${b.endTime} IST`,
               startTime: b.startTime,
               endTime: b.endTime,
