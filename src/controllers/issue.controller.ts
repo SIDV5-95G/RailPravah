@@ -5,7 +5,6 @@
  */
 import { Request, Response } from 'express';
 import { coaFrontendStore } from '../db/coa-frontend-store.js';
-import { broadcastSlotApprovalNotification } from './coa-frontend.controller.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { isSupabaseConfigured } from '../config/env.js';
 import { inMemoryStore } from '../db/in-memory-store.js';
@@ -132,9 +131,12 @@ async function syncIssueToSupabase(
           });
         }
       } else {
+        const cleanDescForDb = (issue.activeRequest.description || issue.activeRequest.title || 'Field defect')
+          .replace(/\s*\(Station:.*$/s, '')
+          .trim();
         const updatePayload: any = {
           status: status as any,
-          description: `[${issue.activeRequest.title}]: ${issue.activeRequest.description} (Station: ${issue.station}, Track: ${issue.activeRequest.trackSection}, Post: ${issue.activeRequest.nearestKmPost}, Line: ${issue.activeRequest.lineType}, Priority: ${priorityStr}, EstTime: ${estTimeStr})`,
+          description: `[${issue.activeRequest.title}]: ${cleanDescForDb} (Station: ${issue.station}, Track: ${issue.activeRequest.trackSection}, Post: ${issue.activeRequest.nearestKmPost}, Line: ${issue.activeRequest.lineType}, Priority: ${priorityStr}, EstTime: ${estTimeStr})`,
           updated_at: new Date().toISOString(),
         };
         if (photoUrl) {
@@ -339,15 +341,22 @@ async function loadComplaintsFromSupabase(): Promise<void> {
         profilesList.find((p: any) => p.role === 'department_head' && p.department === c.department) ||
         profilesList.find((p: any) => p.role === 'department_head');
 
-      const titleMatch = (c.description || '').match(/^\[(.*?)\]:\s*(.*)$/);
-      const title = titleMatch ? titleMatch[1] : 'Field Defect Report';
-      const rawDesc = titleMatch ? titleMatch[2] : c.description || '';
+      // Robust title and description extraction
+      let title = 'Field Defect Report';
+      let rawDesc = c.description || '';
 
-      const stationMatch = rawDesc.match(/Station:\s*([^,\)]+)/i);
-      const trackMatch = rawDesc.match(/Track:\s*([^,\)]+)/i);
-      const postMatch = rawDesc.match(/Post:\s*([^,\)]+)/i);
-      const lineMatch = rawDesc.match(/Line:\s*([^,\)]+)/i);
-      const priorityMatch = rawDesc.match(/Priority:\s*([^,\)]+)/i);
+      const titleMatch = rawDesc.match(/^\[(.*?)\]:\s*(.*)$/s);
+      if (titleMatch) {
+        title = titleMatch[1].trim();
+        rawDesc = titleMatch[2].trim();
+      }
+
+      // Robust metadata extraction regardless of nested parentheses
+      const stationMatch = rawDesc.match(/Station:\s*([^,]+?)(?:,\s*Track:|$)/i);
+      const trackMatch = rawDesc.match(/Track:\s*([^,]+(?:\s*\([^)]*\))?)(?:,\s*Post:|$)/i);
+      const postMatch = rawDesc.match(/Post:\s*([^,]+(?:\s*\([^)]*\))?)(?:,\s*Line:|$)/i);
+      const lineMatch = rawDesc.match(/Line:\s*([^,]+?)(?:,\s*Priority:|$)/i);
+      const priorityMatch = rawDesc.match(/Priority:\s*([^,]+?)(?:,\s*EstTime:|$)/i);
       const estTimeMatch = rawDesc.match(/EstTime:\s*([^,\)]+)/i);
 
       const dynamicStation = stationMatch ? stationMatch[1].trim() : 'Dadar';
@@ -367,7 +376,15 @@ async function loadComplaintsFromSupabase(): Promise<void> {
         : 'High') as PriorityType;
       const dynamicEstTime = estTimeMatch ? parseInt(estTimeMatch[1].replace(/\D/g, '')) || 45 : 45;
 
-      const cleanDesc = rawDesc.replace(/\s*\([^\)]*Station:[^\)]*\)$/i, '').trim();
+      // Clean description by stripping (Station: ... ) trailer
+      let cleanDesc = rawDesc;
+      const metaIdx = rawDesc.indexOf('(Station:');
+      if (metaIdx >= 0) {
+        cleanDesc = rawDesc.substring(0, metaIdx).trim();
+      }
+      if (!cleanDesc) {
+        cleanDesc = title;
+      }
 
       const mediaArr = c.photo_url ? [{ id: 'photo-1', name: 'defect_photo.jpg', type: 'image', url: c.photo_url, size: '2.4 MB' }] : [];
 
@@ -699,8 +716,18 @@ export const editIssue = async (req: Request, res: Response): Promise<void> => {
 
   const nowStr = new Date().toISOString().substring(0, 16).replace('T', ' ');
   if (activeRequest) {
-    issue.activeRequest = { ...issue.activeRequest, ...activeRequest, media: activeRequest.media || issue.activeRequest.media };
+    const cleanActiveDesc = (activeRequest.description || activeRequest.title || issue.activeRequest.description || '')
+      .replace(/\s*\(Station:.*$/s, '')
+      .trim();
+    issue.activeRequest = {
+      ...issue.activeRequest,
+      ...activeRequest,
+      description: cleanActiveDesc || activeRequest.title || issue.activeRequest.title,
+      media: activeRequest.media || issue.activeRequest.media,
+    };
     if (activeRequest.station) issue.station = activeRequest.station;
+    if (activeRequest.title) issue.activeRequest.title = activeRequest.title;
+    if (activeRequest.priority) issue.activeRequest.priority = activeRequest.priority;
   }
 
   issue.modificationHistory.push({
@@ -876,22 +903,6 @@ export const resolveIssue = async (req: Request, res: Response): Promise<void> =
       console.warn('Note inserting approved block on resolveIssue:', sbErr);
     }
   }
-
-  // Broadcast hierarchical slot notification to all roles
-  void broadcastSlotApprovalNotification({
-    slotId: issue.id,
-    slotCode: issue.ticketNo,
-    workName: issue.activeRequest?.title || `${issue.department} Defect Resolution`,
-    location: issue.station || issue.activeRequest?.station || 'Central Line',
-    department: issue.department,
-    timing: '02:00 – 04:30 IST',
-    startTime: '02:00',
-    endTime: '04:30',
-    date: blockDate,
-    sanctionedByRole: effectiveRole,
-    sanctionedByName: modifiedBy?.name || level || effectiveRole,
-    notes: resolutionDetails,
-  });
 
   res.json({ success: true, message: `Issue resolved and certified at ${level || effectiveRole} level.`, issue });
 };
