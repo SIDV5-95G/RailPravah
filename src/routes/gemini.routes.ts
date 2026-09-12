@@ -17,7 +17,7 @@ const whatIfHandler = async (req: Request, res: Response, next: NextFunction) =>
       delayMinutes: delayMinutes || duration,
       trackSector,
     });
-    res.json({ success: true, result });
+    res.json({ ...result, result });
   } catch (err) {
     next(err);
   }

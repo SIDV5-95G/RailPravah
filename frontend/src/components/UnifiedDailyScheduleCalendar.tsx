@@ -135,15 +135,20 @@ export const UnifiedDailyScheduleCalendar: React.FC<UnifiedDailyScheduleCalendar
   role = "coa",
   roleTitle = "COA Control Office Application",
   calendarBlocks,
-  defaultYear = 2026,
-  defaultMonth = 8, // September
-  defaultDay = 8,
+  defaultYear,
+  defaultMonth,
+  defaultDay,
   onNavigateToBlockDetail,
 }) => {
+  const today = useMemo(() => new Date(), []);
+  const initialYear = defaultYear ?? today.getFullYear();
+  const initialMonth = defaultMonth ?? today.getMonth(); // 0-indexed
+  const initialDay = defaultDay ?? today.getDate();
+
   // Calendar Navigation State
-  const [currentYear, setCurrentYear] = useState<number>(defaultYear);
-  const [currentMonth, setCurrentMonth] = useState<number>(defaultMonth); // 0-indexed
-  const [selectedDay, setSelectedDay] = useState<number>(defaultDay);
+  const [currentYear, setCurrentYear] = useState<number>(initialYear);
+  const [currentMonth, setCurrentMonth] = useState<number>(initialMonth); // 0-indexed
+  const [selectedDay, setSelectedDay] = useState<number>(initialDay);
   const [calendarViewMode, setCalendarViewMode] = useState<"month" | "day">("month");
 
   // Filter & Search State

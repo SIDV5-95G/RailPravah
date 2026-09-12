@@ -260,19 +260,72 @@ function executePriorityClusteringAlgorithm(pendingList: CoaServiceRequest[]): C
   return newRecommendations;
 }
 
+// ─── Dynamic Date Utility for AI Slots & Timetable ─────────────────────────────
+
+/**
+ * Computes dynamic, staggered target maintenance dates based on urgency and sequence index.
+ * Returns ISO date string (YYYY-MM-DD) and user-friendly formatted date (e.g. "14 Sep 2026 (Monday)").
+ */
+export function calculateDynamicSlotDate(urgency: string = 'medium', slotIndex: number = 0, baseDate: Date = new Date()) {
+  const target = new Date(baseDate);
+  const u = (urgency || '').toLowerCase();
+  
+  let daysToAdd = 1;
+  if (u === 'emergency') {
+    // Same day or tomorrow
+    daysToAdd = slotIndex === 0 ? 0 : 1;
+  } else if (u === 'high' || u === 'critical') {
+    // 1 to 2 days ahead, staggered
+    daysToAdd = 1 + (slotIndex % 2);
+  } else if (u === 'low') {
+    // 3 to 6 days ahead
+    daysToAdd = 3 + (slotIndex % 4);
+  } else {
+    // Medium / default: 2 to 4 days ahead
+    daysToAdd = 2 + (slotIndex % 3);
+  }
+
+  target.setDate(target.getDate() + daysToAdd);
+
+  // Format in IST (Asia/Kolkata)
+  const isoDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(target);
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  const dayNum = String(target.getDate()).padStart(2, '0');
+  const monthStr = monthNames[target.getMonth()];
+  const yearNum = target.getFullYear();
+  const dayName = dayNames[target.getDay()];
+
+  const formattedDate = `${dayNum} ${monthStr} ${yearNum} (${dayName})`;
+
+  return {
+    scheduledDate: isoDate,
+    scheduledDateFormatted: formattedDate,
+    dayOffset: daysToAdd,
+  };
+}
+
 // ─── Controller Handlers ─────────────────────────────────────────────────────
 
 // Helper to format ISO timestamps to Indian Standard Time (IST, UTC+05:30)
-function parseIsoToIst(isoStr?: string, defaultDate = '2026-09-08', defaultTime = '14:00') {
-  if (!isoStr) return { dateStr: defaultDate, timeStr: defaultTime };
+function parseIsoToIst(isoStr?: string, defaultDate?: string, defaultTime = '14:00') {
+  const fallbackDate = defaultDate || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  if (!isoStr) return { dateStr: fallbackDate, timeStr: defaultTime };
   try {
     const d = new Date(isoStr);
-    if (isNaN(d.getTime())) return { dateStr: defaultDate, timeStr: defaultTime };
+    if (isNaN(d.getTime())) return { dateStr: fallbackDate, timeStr: defaultTime };
     const istDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
     const istTime = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
     return { dateStr: istDate, timeStr: istTime };
   } catch {
-    return { dateStr: defaultDate, timeStr: defaultTime };
+    return { dateStr: fallbackDate, timeStr: defaultTime };
   }
 }
 
@@ -290,8 +343,8 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
       if (dbBlocks && dbBlocks.length > 0) {
         for (const b of dbBlocks as any[]) {
           const exists = coaFrontendStore.calendarBlocks.find((c) => c.id === b.id);
-          const startIst = parseIsoToIst(b.start_time, '2026-09-08', '14:00');
-          const endIst = parseIsoToIst(b.end_time, '2026-09-08', '16:30');
+          const startIst = parseIsoToIst(b.start_time, undefined, '14:00');
+          const endIst = parseIsoToIst(b.end_time, undefined, '16:30');
           const startTime = startIst.timeStr;
           const endTime = endIst.timeStr;
           const dateStr = startIst.dateStr;
@@ -621,17 +674,17 @@ export const getRecommendationsFrontend = async (_req: Request, res: Response): 
                 'Engineering (P-Way)': {
                   status: 'confirmed',
                   note: 'Permanent way track renewals & turnout re-alignment squad ready.',
-                  time: b.created_at?.substring(0, 16).replace('T', ' ') || '2026-09-08 13:30',
+                  time: b.created_at?.substring(0, 16).replace('T', ' ') || new Date().toISOString().substring(0, 16).replace('T', ' '),
                 },
                 'Electrical Traction (TRD)': {
                   status: 'confirmed',
                   note: '25 kV AC OHE power isolation permit locked.',
-                  time: b.created_at?.substring(0, 16).replace('T', ' ') || '2026-09-08 13:35',
+                  time: b.created_at?.substring(0, 16).replace('T', ' ') || new Date().toISOString().substring(0, 16).replace('T', ' '),
                 },
                 'Signal & Telecom (S&T)': {
                   status: 'confirmed',
                   note: 'Point machine & electronic interlocking test crew dispatched.',
-                  time: b.created_at?.substring(0, 16).replace('T', ' ') || '2026-09-08 13:40',
+                  time: b.created_at?.substring(0, 16).replace('T', ' ') || new Date().toISOString().substring(0, 16).replace('T', ' '),
                 },
               },
             });
@@ -1058,6 +1111,9 @@ export const getWhySlotProposals = async (_req: Request, res: Response): Promise
         const netGainMinutes = 63;
         const netGainPercent = 84;
 
+        const primaryUrgency = isHighOrEmergency ? 'high' : 'medium';
+        const dynamicDate = calculateDynamicSlotDate(primaryUrgency, proposals.length);
+
         proposals.push({
           id: `whyslot-${primary.id}`,
           isCluster: true,
@@ -1065,8 +1121,8 @@ export const getWhySlotProposals = async (_req: Request, res: Response): Promise
           slotCode,
           priority: isHighOrEmergency ? 'High Priority' : 'Routine',
           timeWindow,
-          scheduledDate: '2026-09-08',
-          scheduledDateFormatted: '08 Sep 2026 (Tuesday)',
+          scheduledDate: dynamicDate.scheduledDate,
+          scheduledDateFormatted: dynamicDate.scheduledDateFormatted,
           location: locationLabel,
           departments: uniqueDepts,
           departmentLabel,
@@ -1081,9 +1137,9 @@ export const getWhySlotProposals = async (_req: Request, res: Response): Promise
           netGainMinutes,
           netGainPercent: `+${netGainPercent}% Net`,
           travelerImpactLevel: 'Moderate',
-          travelerImpactText: `Multi-Department Joint Possession synchronizes ${uniqueDepts.join(' and ')} operations into a single 2.5h slot at ${primary.parsed.station}. Consolidating prevents taking two separate corridor blocks and saves over 75 minutes of passenger train delays.`,
+          travelerImpactText: `Multi-Department Joint Possession synchronizes ${uniqueDepts.join(' and ')} operations into a single 2.5h slot at ${primary.parsed.station} on ${dynamicDate.scheduledDateFormatted}. Consolidating prevents taking two separate corridor blocks and saves over 75 minutes of passenger train delays.`,
           justificationParagraphs: [
-            `1. Multi-Department Synchronization: Both ${uniqueDepts.join(' and ')} reported critical works on ${primary.parsed.station}. By merging them into a unified possession window (${timeWindow}), total track occupation is compressed from 5.0 hours to 2.5 hours.`,
+            `1. Multi-Department Synchronization: Both ${uniqueDepts.join(' and ')} reported critical works on ${primary.parsed.station}. By merging them into a unified possession window (${timeWindow} on ${dynamicDate.scheduledDateFormatted}), total track occupation is compressed from 5.0 hours to 2.5 hours.`,
             `2. Integrated Safety Protocol: 25kV OHE power isolation is synchronized with P-WAY heavy track gangs. Safe concurrent possession verified under Central Railway safety matrix.`,
             `3. Commuter Impact Mitigation: Scheduling as a single cluster prevents compounded rescheduling of local services and protects evening peak traffic.`,
           ],
@@ -1177,8 +1233,10 @@ export const getWhySlotProposals = async (_req: Request, res: Response): Promise
         ? `Cancellation of ${cancelledLocals.map((t) => t.name).join(', ')} will increase platform density at ${parsed.station} by an estimated ${cancelledLocals.length * 15}% between ${slotStartStr} and ${slotEndStr} IST. Surrounding services have capacity to absorb the overflow within 20 minutes.`
         : `Night slot in low frequency window (${timeWindow}) minimizes commuter disruption to zero at ${parsed.station}. Only ${trainsAffectedCount} regulated service (${trainsAffectedList.map((t) => t.name).join(', ')}).`;
 
+      const dynamicDate = calculateDynamicSlotDate(c.urgency || (isHighOrEmergency ? 'high' : 'medium'), proposals.length);
+
       const justificationParagraphs = [
-        `The proposed maintenance slot leverages a historical lull in freight and suburban traffic on the ${parsed.line} between ${parsed.track}. By shifting the block start time forward by 15 minutes, we avoid compounding delays on ${expressRescheduled ? expressRescheduled.name : 'express and passenger services'} (${trainsAffectedCount} total trains managed).`,
+        `The proposed maintenance slot on ${dynamicDate.scheduledDateFormatted} leverages a historical lull in freight and suburban traffic on the ${parsed.line} between ${parsed.track}. By shifting the block start time forward by 15 minutes, we avoid compounding delays on ${expressRescheduled ? expressRescheduled.name : 'express and passenger services'} (${trainsAffectedCount} total trains managed).`,
         `Alternative scenarios were evaluated. While they avoid cancelling suburban services, they increase the overall track occupation time by 40 minutes due to necessary switching operations, leading to a cascading delay effect entering the evening peak hours.`,
       ];
 
@@ -1191,8 +1249,8 @@ export const getWhySlotProposals = async (_req: Request, res: Response): Promise
         slotCode,
         priority: slotPriority,
         timeWindow,
-        scheduledDate: '2026-09-08',
-        scheduledDateFormatted: '08 Sep 2026 (Tuesday)',
+        scheduledDate: dynamicDate.scheduledDate,
+        scheduledDateFormatted: dynamicDate.scheduledDateFormatted,
         location: locationLabel,
         score,
         confidence,
@@ -1240,7 +1298,8 @@ export const approveWhySlotProposal = async (req: Request, res: Response): Promi
     trainsAffected,
   } = req.body;
 
-  const targetDate = date || '2026-09-08';
+  const fallbackDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const targetDate = date || fallbackDate;
   const cleanTimeStr = (timeWindow || '14:00 – 16:30').replace(/IST/g, '').trim();
   const startTime = cleanTimeStr.split(/[\–\-]/)[0]?.trim() || '14:00';
   const endTime = cleanTimeStr.split(/[\–\-]/)[1]?.trim() || '16:30';

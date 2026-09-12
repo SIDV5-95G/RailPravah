@@ -86,7 +86,7 @@ export const WhySlotScreen: React.FC<WhySlotScreenProps> = ({
           slotCode: slot.slotCode,
           location: slot.location,
           timeWindow: slot.timeWindow,
-          date: slot.scheduledDate || "2026-09-08",
+          date: slot.scheduledDate || new Date().toISOString().split('T')[0],
           workName: slot.isCluster
             ? `[CLUSTER] Joint Possession: ${slot.departmentLabel || slot.departments?.join(' + ')} (${slot.location})`
             : `AI Slot ${slot.slotCode}: ${slot.location}`,

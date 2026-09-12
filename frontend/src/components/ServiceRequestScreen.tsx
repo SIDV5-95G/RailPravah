@@ -41,9 +41,11 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
   const [department, setDepartment] = useState<DepartmentType>("Engineering");
   const [trackArea, setTrackArea] = useState("Kurla - Thane");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<PriorityType>("High");
-  const [preferredSlot, setPreferredSlot] = useState("2026-09-08 01:30 - 04:30");
-  const [timePeriodType, setTimePeriodType] = useState<MaintenancePeriodType>("weekly");
+  const [preferredSlot, setPreferredSlot] = useState(() => {
+    const tmr = new Date();
+    tmr.setDate(tmr.getDate() + 1);
+    return `${tmr.toISOString().split('T')[0]} 01:30 - 04:30`;
+  });
   const [customTimePeriod, setCustomTimePeriod] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [showSuccessToast, setShowSuccessToast] = useState(false);

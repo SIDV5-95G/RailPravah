@@ -138,12 +138,15 @@ export const WorkerTaskCalendar: React.FC<WorkerTaskCalendarProps> = ({
   // View mode toggle: "month" for full interactive month grid (as in COA), "day" for detailed daily timeline
   const [calendarViewMode, setCalendarViewMode] = useState<"month" | "day">("month");
 
-  // Selected date (Defaults to Today: "2026-09-02")
-  const [selectedDate, setSelectedDate] = useState<string>("2026-09-02");
+  const todayStr = useMemo(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()), []);
+  const todayDateObj = useMemo(() => new Date(), []);
+
+  // Selected date (Defaults to dynamic Today in IST)
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
   // Calendar Month Navigation (Current display month / year)
-  const [currentYear, setCurrentYear] = useState<number>(2026);
-  const [currentMonth, setCurrentMonth] = useState<number>(8); // 8 = September (0-indexed)
+  const [currentYear, setCurrentYear] = useState<number>(() => todayDateObj.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState<number>(() => todayDateObj.getMonth()); // 0-indexed
 
   // Selected Task Filter (All, Today, Upcoming, Completed)
   const [departmentFilter, setDepartmentFilter] = useState<string>("ALL");
@@ -474,10 +477,11 @@ export const WorkerTaskCalendar: React.FC<WorkerTaskCalendarProps> = ({
   };
 
   const handleJumpToToday = () => {
-    setCurrentYear(2026);
-    setCurrentMonth(8); // September 2026
-    setSelectedDate("2026-09-02");
-    setSelectedTaskId("task-001");
+    const now = new Date();
+    setCurrentYear(now.getFullYear());
+    setCurrentMonth(now.getMonth());
+    setSelectedDate(todayStr);
+    setSelectedTaskId("");
   };
 
   // Get tasks for any date string with active filters applied
@@ -501,20 +505,27 @@ export const WorkerTaskCalendar: React.FC<WorkerTaskCalendarProps> = ({
 
   // Quick 7-day strip centered around Today / Selected Date
   const quickDays = useMemo(() => {
-    const list = [
-      { date: "2026-09-01", dayNum: "01", dayNameEn: "Tue", dayNameHi: "मंगल" },
-      { date: "2026-09-02", dayNum: "02", dayNameEn: "Wed", dayNameHi: "बुध", isToday: true },
-      { date: "2026-09-03", dayNum: "03", dayNameEn: "Thu", dayNameHi: "गुरु" },
-      { date: "2026-09-04", dayNum: "04", dayNameEn: "Fri", dayNameHi: "शुक्र" },
-      { date: "2026-09-05", dayNum: "05", dayNameEn: "Sat", dayNameHi: "शनि" },
-      { date: "2026-09-06", dayNum: "06", dayNameEn: "Sun", dayNameHi: "रवि" },
-      { date: "2026-09-07", dayNum: "07", dayNameEn: "Mon", dayNameHi: "सोम" },
-    ];
-    return list.map((item) => ({
+    const days = [];
+    const base = new Date();
+    for (let offset = -2; offset <= 4; offset++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() + offset);
+      const iso = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+      const dayNum = String(d.getDate()).padStart(2, "0");
+      const isToday = iso === todayStr;
+      days.push({
+        date: iso,
+        dayNum,
+        dayNameEn: currentT.daysShort[d.getDay()],
+        dayNameHi: ["रवि", "सोम", "मंगल", "बुध", "गुरु", "शुक्र", "शनि"][d.getDay()],
+        isToday,
+      });
+    }
+    return days.map((item) => ({
       ...item,
       tasks: allScheduleItems.filter((t) => t.date === item.date).length,
     }));
-  }, [allScheduleItems]);
+  }, [allScheduleItems, currentT, todayStr]);
 
   return (
     <div id="worker-task-calendar-container" className="space-y-6">
@@ -825,7 +836,7 @@ export const WorkerTaskCalendar: React.FC<WorkerTaskCalendarProps> = ({
                   dayNumber
                 ).padStart(2, "0")}`;
                 const isSelected = selectedDate === formattedDate;
-                const isToday = formattedDate === "2026-09-02";
+                const isToday = formattedDate === todayStr;
                 const dayTasks = getTasksForDateString(formattedDate);
                 const hasTasks = dayTasks.length > 0;
 
@@ -1233,7 +1244,7 @@ export const WorkerTaskCalendar: React.FC<WorkerTaskCalendarProps> = ({
                   dayNumber
                 ).padStart(2, "0")}`;
                 const isSelected = selectedDate === formattedDate;
-                const isToday = formattedDate === "2026-09-02";
+                const isToday = formattedDate === todayStr;
                 const dayTasks = getTasksForDateString(formattedDate);
                 const hasTasks = dayTasks.length > 0;
 

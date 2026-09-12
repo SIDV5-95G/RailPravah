@@ -43,13 +43,22 @@ export const CoaProvidePlanModal: React.FC<CoaProvidePlanModalProps> = ({
     const track = request.trackArea;
     const dept = request.department;
 
+    const now = new Date();
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+    const d1 = new Date(now); d1.setDate(d1.getDate() + 1);
+    const d2 = new Date(now); d2.setDate(d2.getDate() + 3);
+    const d3 = new Date(now); d3.setDate(d3.getDate() + 5);
+    const d4 = new Date(now); d4.setDate(d4.getDate() + 7);
+
     if (scheduleType === "weekly") {
       // 3 shifts across a 7-day week
       return [
         {
           id: `slot-${Date.now()}-1`,
-          date: "2026-09-08",
-          dayName: "Tuesday",
+          date: fmt(d1),
+          dayName: dayNames[d1.getDay()],
           startTime: "01:30",
           endTime: "04:30",
           timeSlot: "01:30 – 04:30 IST",
@@ -64,44 +73,49 @@ export const CoaProvidePlanModal: React.FC<CoaProvidePlanModalProps> = ({
         },
         {
           id: `slot-${Date.now()}-2`,
-          date: "2026-09-10",
-          dayName: "Thursday",
+          date: fmt(d2),
+          dayName: dayNames[d2.getDay()],
           startTime: "01:30",
           endTime: "04:30",
           timeSlot: "01:30 – 04:30 IST",
           trackArea: track,
           department: dept,
           taskName: taskTitle,
-          description: `Shift 2: Primary execution & mechanized track possession. ${desc}`,
+          description: `Shift 2: Heavy engineering & component replacement. ${desc}`,
           status: "Sanctioned",
-          machineryGangs: "Plasser Machine / OHE Tower Car + 16 Trackmen",
-          cautionOrder: "Dead slow 30 km/h on UP/DOWN line",
-          trainsAffected: 3,
+          machineryGangs: "Specialized Maintenance Vehicle",
+          cautionOrder: "Speed restricted to 30 km/h",
+          trainsAffected: 1,
         },
         {
           id: `slot-${Date.now()}-3`,
-          date: "2026-09-12",
-          dayName: "Saturday",
+          date: fmt(d3),
+          dayName: dayNames[d3.getDay()],
           startTime: "02:00",
           endTime: "05:00",
           timeSlot: "02:00 – 05:00 IST",
           trackArea: track,
           department: dept,
           taskName: taskTitle,
-          description: `Shift 3: Final packing, track geometry verification, speed restoration testing.`,
+          description: `Shift 3: Calibration, testing & track clearance.`,
           status: "Sanctioned",
-          machineryGangs: "Certification Team + Gang #4",
-          cautionOrder: "Speed restored to normal after 05:00",
-          trainsAffected: 1,
+          machineryGangs: "Track Testing Crew + Tower Car",
+          cautionOrder: "Normal track speed restoration pending check",
+          trainsAffected: 0,
         },
       ];
     } else if (scheduleType === "monthly") {
-      // 4 weekend / mid-week cycles across September
+      // 4 cycles across upcoming month
+      const m1 = new Date(now); m1.setDate(m1.getDate() + 2);
+      const m2 = new Date(now); m2.setDate(m2.getDate() + 9);
+      const m3 = new Date(now); m3.setDate(m3.getDate() + 16);
+      const m4 = new Date(now); m4.setDate(m4.getDate() + 23);
+
       return [
         {
           id: `slot-${Date.now()}-1`,
-          date: "2026-09-06",
-          dayName: "Sunday",
+          date: fmt(m1),
+          dayName: dayNames[m1.getDay()],
           startTime: "01:00",
           endTime: "05:00",
           timeSlot: "01:00 – 05:00 IST",
@@ -116,8 +130,8 @@ export const CoaProvidePlanModal: React.FC<CoaProvidePlanModalProps> = ({
         },
         {
           id: `slot-${Date.now()}-2`,
-          date: "2026-09-13",
-          dayName: "Sunday",
+          date: fmt(m2),
+          dayName: dayNames[m2.getDay()],
           startTime: "01:00",
           endTime: "05:00",
           timeSlot: "01:00 – 05:00 IST",
@@ -132,8 +146,8 @@ export const CoaProvidePlanModal: React.FC<CoaProvidePlanModalProps> = ({
         },
         {
           id: `slot-${Date.now()}-3`,
-          date: "2026-09-20",
-          dayName: "Sunday",
+          date: fmt(m3),
+          dayName: dayNames[m3.getDay()],
           startTime: "01:00",
           endTime: "05:00",
           timeSlot: "01:00 – 05:00 IST",
@@ -148,8 +162,8 @@ export const CoaProvidePlanModal: React.FC<CoaProvidePlanModalProps> = ({
         },
         {
           id: `slot-${Date.now()}-4`,
-          date: "2026-09-27",
-          dayName: "Sunday",
+          date: fmt(m4),
+          dayName: dayNames[m4.getDay()],
           startTime: "01:30",
           endTime: "04:30",
           timeSlot: "01:30 – 04:30 IST",
@@ -168,8 +182,8 @@ export const CoaProvidePlanModal: React.FC<CoaProvidePlanModalProps> = ({
       return [
         {
           id: `slot-${Date.now()}-1`,
-          date: "2026-09-09",
-          dayName: "Wednesday",
+          date: fmt(d1),
+          dayName: dayNames[d1.getDay()],
           startTime: "02:00",
           endTime: "04:30",
           timeSlot: "02:00 – 04:30 IST",
@@ -184,8 +198,8 @@ export const CoaProvidePlanModal: React.FC<CoaProvidePlanModalProps> = ({
         },
         {
           id: `slot-${Date.now()}-2`,
-          date: "2026-09-16",
-          dayName: "Wednesday",
+          date: fmt(d4),
+          dayName: dayNames[d4.getDay()],
           startTime: "02:00",
           endTime: "04:30",
           timeSlot: "02:00 – 04:30 IST",
@@ -204,8 +218,8 @@ export const CoaProvidePlanModal: React.FC<CoaProvidePlanModalProps> = ({
       return [
         {
           id: `slot-${Date.now()}-1`,
-          date: "2026-09-08",
-          dayName: "Tuesday",
+          date: fmt(d1),
+          dayName: dayNames[d1.getDay()],
           startTime: "02:00",
           endTime: "04:30",
           timeSlot: "02:00 – 04:30 IST",
@@ -296,8 +310,8 @@ export const CoaProvidePlanModal: React.FC<CoaProvidePlanModalProps> = ({
     const plan: MaintenanceSchedulePlan = {
       scheduleType,
       periodLabel: getPeriodBadge(),
-      startDate: slots[0]?.date || "2026-09-08",
-      endDate: slots[slots.length - 1]?.date || "2026-09-14",
+      startDate: slots[0]?.date || new Date().toISOString().split("T")[0],
+      endDate: slots[slots.length - 1]?.date || new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
       taskName,
       description: request.description,
       trackArea: request.trackArea,
