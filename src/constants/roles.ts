@@ -122,7 +122,7 @@ export const MOCK_USERS = [
   },
   // S&T
   {
-    id: 's3000000-0000-0000-0000-000000000001',
+    id: 'd3000000-0000-0000-0000-000000000001',
     email: 'st.pcste@railpravah.gov.in',
     name: 'Harish Chandra (S&T Dept Head / PCSTE)',
     role: 'department_head' as UserRole,
@@ -130,27 +130,27 @@ export const MOCK_USERS = [
     reports_to: null,
   },
   {
-    id: 's3000000-0000-0000-0000-000000000002',
+    id: 'd3000000-0000-0000-0000-000000000002',
     email: 'st.zonal@railpravah.gov.in',
     name: 'Anand Kulkarni (S&T Zonal Head / SrDSTE)',
     role: 'zonal_head' as UserRole,
     department: 'signal_comm' as DepartmentType,
-    reports_to: 's3000000-0000-0000-0000-000000000001',
+    reports_to: 'd3000000-0000-0000-0000-000000000001',
   },
   {
-    id: 's3000000-0000-0000-0000-000000000003',
+    id: 'd3000000-0000-0000-0000-000000000003',
     email: 'st.sup@railpravah.gov.in',
     name: 'Sanjay Bhatt (S&T Supervisor / SSE Signal)',
     role: 'supervisor' as UserRole,
     department: 'signal_comm' as DepartmentType,
-    reports_to: 's3000000-0000-0000-0000-000000000002',
+    reports_to: 'd3000000-0000-0000-0000-000000000002',
   },
   {
-    id: 's3000000-0000-0000-0000-000000000004',
+    id: 'd3000000-0000-0000-0000-000000000004',
     email: 'st.worker@railpravah.gov.in',
     name: 'Gopal Tiwari (S&T Signal Maintainer)',
     role: 'worker' as UserRole,
     department: 'signal_comm' as DepartmentType,
-    reports_to: 's3000000-0000-0000-0000-000000000003',
+    reports_to: 'd3000000-0000-0000-0000-000000000003',
   },
 ];

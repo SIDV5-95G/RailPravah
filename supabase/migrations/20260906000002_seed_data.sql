@@ -21,10 +21,10 @@
 --   e2000000-0000-0000-0000-000000000003 (SUP-CR-3105) - SSE TRD Kalyan
 --   e2000000-0000-0000-0000-000000000004 (WRK-CR-1002) - OHE Linesman
 -- Signal & Telecom Hierarchy:
---   s3000000-0000-0000-0000-000000000001 (DPT-CR-5540) - Sr. DSTE
---   s3000000-0000-0000-0000-000000000002 (ZON-CR-1104) - CSTE HQ
---   s3000000-0000-0000-0000-000000000003 (SUP-CR-3106) - SSE Signal CSMT
---   s3000000-0000-0000-0000-000000000004 (WRK-CR-1003) - Signal Maintainer
+--   d3000000-0000-0000-0000-000000000001 (DPT-CR-5540) - Sr. DSTE
+--   d3000000-0000-0000-0000-000000000002 (ZON-CR-1104) - CSTE HQ
+--   d3000000-0000-0000-0000-000000000003 (SUP-CR-3106) - SSE Signal CSMT
+--   d3000000-0000-0000-0000-000000000004 (WRK-CR-1003) - Signal Maintainer
 
 INSERT INTO profiles (id, email, name, role, department, reports_to)
 VALUES
@@ -44,10 +44,10 @@ VALUES
   ('e2000000-0000-0000-0000-000000000004', 'wrk-cr-1002@railpravah.gov.in', 'Suresh Patil (Linesman / WRK-CR-1002)', 'worker', 'electrical', 'e2000000-0000-0000-0000-000000000003'),
 
   -- 4. Signal & Telecom (S&C) Department Hierarchy
-  ('s3000000-0000-0000-0000-000000000001', 'dpt-cr-5540@railpravah.gov.in', 'M. S. Raghavan (Sr. DSTE / DPT-CR-5540)', 'department_head', 'signal_comm', 'a0000000-0000-0000-0000-000000000001'),
-  ('s3000000-0000-0000-0000-000000000002', 'zon-cr-1104@railpravah.gov.in', 'R. K. Sharma (CSTE HQ / ZON-CR-1104)', 'zonal_head', 'signal_comm', 's3000000-0000-0000-0000-000000000001'),
-  ('s3000000-0000-0000-0000-000000000003', 'sup-cr-3106@railpravah.gov.in', 'Deepak V. Kulkarni (SSE Signal / SUP-CR-3106)', 'supervisor', 'signal_comm', 's3000000-0000-0000-0000-000000000002'),
-  ('s3000000-0000-0000-0000-000000000004', 'wrk-cr-1003@railpravah.gov.in', 'Santosh Jadhav (Signal Maintainer / WRK-CR-1003)', 'worker', 'signal_comm', 's3000000-0000-0000-0000-000000000003')
+  ('d3000000-0000-0000-0000-000000000001', 'dpt-cr-5540@railpravah.gov.in', 'M. S. Raghavan (Sr. DSTE / DPT-CR-5540)', 'department_head', 'signal_comm', 'a0000000-0000-0000-0000-000000000001'),
+  ('d3000000-0000-0000-0000-000000000002', 'zon-cr-1104@railpravah.gov.in', 'R. K. Sharma (CSTE HQ / ZON-CR-1104)', 'zonal_head', 'signal_comm', 'd3000000-0000-0000-0000-000000000001'),
+  ('d3000000-0000-0000-0000-000000000003', 'sup-cr-3106@railpravah.gov.in', 'Deepak V. Kulkarni (SSE Signal / SUP-CR-3106)', 'supervisor', 'signal_comm', 'd3000000-0000-0000-0000-000000000002'),
+  ('d3000000-0000-0000-0000-000000000004', 'wrk-cr-1003@railpravah.gov.in', 'Santosh Jadhav (Signal Maintainer / WRK-CR-1003)', 'worker', 'signal_comm', 'd3000000-0000-0000-0000-000000000003')
 ON CONFLICT (id) DO UPDATE SET
   email = EXCLUDED.email,
   name = EXCLUDED.name,
@@ -247,7 +247,7 @@ VALUES
   ),
   (
     '00000001-0000-0000-0000-000000000003',
-    's3000000-0000-0000-0000-000000000002', -- S&T Zonal Head
+    'd3000000-0000-0000-0000-000000000002', -- S&T Zonal Head
     'signal_comm',
     'DR – GC (Dadar - Ghatkopar)',
     NOW() + INTERVAL '1 day' + INTERVAL '2 hours',
