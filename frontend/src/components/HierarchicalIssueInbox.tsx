@@ -75,9 +75,9 @@ export const HierarchicalIssueInbox: React.FC<HierarchicalIssueInboxProps> = ({
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
 
   // Fetch issues with backend hierarchy role headers
-  const fetchIssues = async () => {
+  const fetchIssues = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const headers: Record<string, string> = {
         "x-user-role": user.userRole,
         "x-user-empid": user.empId,
@@ -94,17 +94,18 @@ export const HierarchicalIssueInbox: React.FC<HierarchicalIssueInboxProps> = ({
     } catch (err) {
       console.error("Error fetching hierarchical issues:", err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchIssues();
+    fetchIssues(true);
     const handleIssuesUpdated = () => {
-      fetchIssues();
+      fetchIssues(false);
     };
     window.addEventListener("railpravah:issues-updated", handleIssuesUpdated);
-    const interval = setInterval(fetchIssues, 4000);
+    // Refresh periodically every 2 minutes (120,000ms)
+    const interval = setInterval(() => fetchIssues(false), 120000);
     return () => {
       window.removeEventListener("railpravah:issues-updated", handleIssuesUpdated);
       clearInterval(interval);

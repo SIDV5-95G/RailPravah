@@ -217,7 +217,8 @@ export const App: React.FC = () => {
         .catch((e) => console.warn("Could not load /api/coa/conflict-queue:", e));
     };
     fetchConflictQueue();
-    const conflictInterval = setInterval(fetchConflictQueue, 6000);
+    // Refresh conflict queue periodically every 2 minutes (120,000ms)
+    const conflictInterval = setInterval(fetchConflictQueue, 120000);
 
     // 6. Fetch Operational Notifications periodically with role & department context
     const fetchNotifications = () => {
@@ -252,7 +253,8 @@ export const App: React.FC = () => {
     };
 
     fetchNotifications();
-    const notifInterval = setInterval(fetchNotifications, 5000);
+    // Refresh notifications periodically every 2 minutes (120,000ms)
+    const notifInterval = setInterval(fetchNotifications, 120000);
 
     fetchSlotNotificationsFromFirestore()
       .then((fbNotifs) => {

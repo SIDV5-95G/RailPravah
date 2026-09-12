@@ -174,7 +174,8 @@ export const UnifiedDailyScheduleCalendar: React.FC<UnifiedDailyScheduleCalendar
       }
     };
     loadBlocks();
-    const interval = setInterval(loadBlocks, 4000);
+    // Refresh calendar periodically every 2 minutes (120,000ms)
+    const interval = setInterval(loadBlocks, 120000);
     return () => clearInterval(interval);
   }, [currentYear, currentMonth]);
 

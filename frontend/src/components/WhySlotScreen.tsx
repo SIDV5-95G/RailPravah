@@ -41,8 +41,8 @@ export const WhySlotScreen: React.FC<WhySlotScreenProps> = ({
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
   // Fetch AI proposals from database (/api/coa/whyslot-proposals)
-  const fetchProposals = useCallback(async () => {
-    setIsLoading(true);
+  const fetchProposals = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setIsLoading(true);
     try {
       const res = await fetch("/api/coa/whyslot-proposals");
       const data = await res.json();
@@ -55,13 +55,14 @@ export const WhySlotScreen: React.FC<WhySlotScreenProps> = ({
     } catch (e) {
       console.warn("Could not fetch /api/coa/whyslot-proposals:", e);
     } finally {
-      setIsLoading(false);
+      if (showSpinner) setIsLoading(false);
     }
   }, [selectedSlotId]);
 
   useEffect(() => {
-    fetchProposals();
-    const interval = setInterval(fetchProposals, 5000);
+    fetchProposals(true);
+    // Refresh proposals periodically every 2 minutes (120,000ms)
+    const interval = setInterval(() => fetchProposals(false), 120000);
     return () => clearInterval(interval);
   }, [fetchProposals]);
 
