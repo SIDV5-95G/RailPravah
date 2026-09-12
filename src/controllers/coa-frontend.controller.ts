@@ -83,16 +83,17 @@ export async function broadcastSlotApprovalNotification(params: SlotApprovalNoti
       ? 'Section Supervisor'
       : 'COA Central Dispatch';
 
-  const slotCode = params.slotCode || `SANCTION-CR-${Date.now().toString().slice(-4)}`;
+  const normSlotCode = (params.slotCode || `SANCTION-CR-${Date.now().toString().slice(-4)}`).trim().toUpperCase();
+  const canonicalId = `notif-slot-${normSlotCode.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`;
   const dateStr = params.date || new Date().toISOString().split('T')[0];
   const startTime = params.startTime || '01:30';
   const endTime = params.endTime || '04:30';
   const timing = params.timing || `${startTime} – ${endTime} IST`;
 
   const slotNotification = {
-    id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    slotId: params.slotId || `slot-${Date.now()}`,
-    slotCode,
+    id: canonicalId,
+    slotId: params.slotId || `slot-${normSlotCode}`,
+    slotCode: normSlotCode,
     title: `[SLOT SANCTIONED: ${roleLabel}] ${deptLabel} Track Possession Window`,
     message: `${params.sanctionedByName || roleLabel} has sanctioned a maintenance possession slot for ${params.location} on ${dateStr} (${timing}). Work: ${params.workName}. ${params.notes ? `Details: ${params.notes}` : 'Possession window locked.'}`,
     timing,
@@ -109,10 +110,21 @@ export async function broadcastSlotApprovalNotification(params: SlotApprovalNoti
     status: 'active' as const,
   };
 
-  // 1. In-memory stores
+  // 1. Deduplicate and update in-memory stores
+  coaFrontendStore.slotNotifications = coaFrontendStore.slotNotifications.filter(
+    (n) => (n.slotCode ? n.slotCode.toUpperCase() !== normSlotCode : true) && n.id !== canonicalId
+  );
   coaFrontendStore.slotNotifications.unshift(slotNotification);
+
+  inMemoryStore.notifications = inMemoryStore.notifications.filter(
+    (n: any) =>
+      ((n as any).slotCode && (n as any).slotCode.toUpperCase() === normSlotCode)
+        ? false
+        : (n.id !== canonicalId && !(n.message && n.message.includes(normSlotCode)))
+  );
   inMemoryStore.notifications.unshift({
     id: slotNotification.id,
+    slotCode: normSlotCode,
     user_id: 'broadcast-dept',
     title: slotNotification.title,
     message: slotNotification.message,
@@ -132,6 +144,16 @@ export async function broadcastSlotApprovalNotification(params: SlotApprovalNoti
         .or(`department.eq.${deptKey},role.eq.coa_admin`);
 
       if (targetProfiles && targetProfiles.length > 0) {
+        // Remove older duplicates for the same slotCode from notifications table
+        try {
+          await supabaseAdmin
+            .from('notifications')
+            .delete()
+            .ilike('message', `%${normSlotCode}%`);
+        } catch {
+          // ignore
+        }
+
         const notifInserts = targetProfiles.map((p: any) => ({
           user_id: p.id,
           title: slotNotification.title,

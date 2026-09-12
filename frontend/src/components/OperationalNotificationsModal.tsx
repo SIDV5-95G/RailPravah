@@ -32,6 +32,26 @@ export const OperationalNotificationsModal: React.FC<
   );
   const [loading, setLoading] = useState<boolean>(false);
 
+  // Canonical deduplication by slot code
+  const uniqueNotifications = React.useMemo(() => {
+    const notifMap = new Map<string, PravahSlotNotification>();
+    notifications.forEach((n) => {
+      const msg = n.message || "";
+      const title = n.title || "";
+      const match =
+        n.slotCode ||
+        (n as any).slot_code ||
+        title.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0] ||
+        msg.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0];
+
+      const key = match ? `slot_${match.toUpperCase()}` : `id_${n.id}`;
+      if (!notifMap.has(key)) {
+        notifMap.set(key, n);
+      }
+    });
+    return Array.from(notifMap.values());
+  }, [notifications]);
+
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
@@ -72,7 +92,7 @@ export const OperationalNotificationsModal: React.FC<
               <h2 className="text-base font-bold text-[#191c1e] flex items-center gap-2">
                 <span>Operational Slot Notifications</span>
                 <span className="px-2 py-0.5 bg-[#e2dfff] text-[#3525cd] text-xs font-mono font-bold rounded-full">
-                  {notifications.length}
+                  {uniqueNotifications.length}
                 </span>
               </h2>
               <p className="text-xs text-[#777587]">
@@ -94,7 +114,7 @@ export const OperationalNotificationsModal: React.FC<
             <div className="p-8 text-center text-xs text-[#777587]">
               Syncing notifications feed...
             </div>
-          ) : notifications.length === 0 ? (
+          ) : uniqueNotifications.length === 0 ? (
             <div className="p-10 text-center space-y-2 text-[#777587]">
               <Bell className="w-8 h-8 mx-auto opacity-40" />
               <div className="text-sm font-semibold">No Active Dispatches</div>
@@ -103,7 +123,7 @@ export const OperationalNotificationsModal: React.FC<
               </div>
             </div>
           ) : (
-            notifications.map((rawNotif) => {
+            uniqueNotifications.map((rawNotif) => {
               const msg = rawNotif.message || "";
               const title = rawNotif.title || "";
 

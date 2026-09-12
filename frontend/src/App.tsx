@@ -233,7 +233,19 @@ export const App: React.FC = () => {
         .then((r) => r.json())
         .then((data) => {
           if (data.success && Array.isArray(data.notifications)) {
-            setOperationalNotifications(data.notifications);
+            const notifMap = new Map<string, PravahSlotNotification>();
+            data.notifications.forEach((n: PravahSlotNotification) => {
+              const msg = n.message || "";
+              const title = n.title || "";
+              const match =
+                n.slotCode ||
+                (n as any).slot_code ||
+                title.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0] ||
+                msg.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0];
+              const key = match ? `slot_${match.toUpperCase()}` : `id_${n.id}`;
+              if (!notifMap.has(key)) notifMap.set(key, n);
+            });
+            setOperationalNotifications(Array.from(notifMap.values()));
           }
         })
         .catch((e) => console.warn("Could not load /api/notifications:", e));
@@ -246,9 +258,19 @@ export const App: React.FC = () => {
       .then((fbNotifs) => {
         if (Array.isArray(fbNotifs) && fbNotifs.length > 0) {
           setOperationalNotifications((prev) => {
-            const ids = new Set(prev.map((n) => n.id));
-            const newItems = fbNotifs.filter((n) => !ids.has(n.id));
-            return [...newItems, ...prev];
+            const notifMap = new Map<string, PravahSlotNotification>();
+            [...prev, ...fbNotifs].forEach((n) => {
+              const msg = n.message || "";
+              const title = n.title || "";
+              const match =
+                n.slotCode ||
+                (n as any).slot_code ||
+                title.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0] ||
+                msg.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0];
+              const key = match ? `slot_${match.toUpperCase()}` : `id_${n.id}`;
+              if (!notifMap.has(key)) notifMap.set(key, n);
+            });
+            return Array.from(notifMap.values());
           });
         }
       })

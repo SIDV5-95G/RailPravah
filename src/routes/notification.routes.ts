@@ -153,15 +153,31 @@ router.get('/', async (req: Request, res: Response) => {
     });
   }
 
-  // Deduplicate and combine
-  const seenIds = new Set<string>();
-  const combined: any[] = [];
-  for (const item of [...slotList, ...sysList]) {
-    if (!seenIds.has(item.id)) {
-      seenIds.add(item.id);
-      combined.push(item);
+  // Deduplicate and combine by canonical slot key
+  const notifMap = new Map<string, any>();
+  for (const item of [...slotList, ...sysList] as any[]) {
+    const rawMsg = item.message || '';
+    const rawTitle = item.title || '';
+    const match =
+      item.slotCode ||
+      item.slot_code ||
+      rawTitle.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0] ||
+      rawMsg.match(/(?:SLOT|SANCTION|WHYSLOT|CLUSTER)-[A-Z0-9\-_]+/i)?.[0];
+
+    const slotKey = match ? `slot_${match.toUpperCase()}` : `id_${item.id}`;
+
+    if (notifMap.has(slotKey)) {
+      const existing = notifMap.get(slotKey)!;
+      // Prefer richer slotNotification payload
+      if (!existing.slotCode && item.slotCode) {
+        notifMap.set(slotKey, item);
+      }
+    } else {
+      notifMap.set(slotKey, item);
     }
   }
+
+  const combined = Array.from(notifMap.values());
 
   res.json({
     success: true,
