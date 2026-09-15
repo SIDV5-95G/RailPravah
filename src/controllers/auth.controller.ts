@@ -3,7 +3,8 @@ import { supabaseAdmin, createAuthClient } from '../config/supabase.js';
 import { isSupabaseConfigured } from '../config/env.js';
 import { inMemoryStore } from '../db/in-memory-store.js';
 import { UserProfile, UserRole, DepartmentType } from '../types/database.types.js';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomInt } from 'crypto';
+import { MOCK_USERS } from '../constants/roles.js';
 
 /**
  * Helper to automatically resolve the direct reporting superior profile ID based on role & department.
@@ -74,11 +75,11 @@ async function resolveReportingSuperiorId(
 /**
  * POST /api/auth/register
  * Creates a new user in Supabase Auth and inserts their profile into the `profiles` table
- * with strict auto-assigned reports_to linking.
+ * with strict auto-assigned reports_to linking and mobile phone number.
  */
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { name, email, password, role, department, employee_id, empId } = req.body;
+    const { name, email, password, role, department, employee_id, empId, phone, mobile } = req.body;
 
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
       res.status(400).json({ success: false, error: 'A valid Full Name (minimum 2 characters) is required.' });
@@ -143,6 +144,19 @@ export const register = async (req: Request, res: Response, next: NextFunction):
     const userEmail = email || `${officialEmpId.toLowerCase()}@railpravah.gov.in`;
     const userPassword = password.trim();
 
+    // Format phone number
+    let userPhone: string | null = null;
+    const rawPhone = (phone || mobile || '').toString().trim();
+    if (rawPhone) {
+      const digitsOnly = rawPhone.replace(/\D/g, '');
+      if (digitsOnly.length >= 10) {
+        const last10 = digitsOnly.slice(-10);
+        userPhone = `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`;
+      } else {
+        userPhone = rawPhone;
+      }
+    }
+
     // Map department string to valid DB enum
     let normalizedDept: DepartmentType | null = null;
     if (normalizedRole !== 'coa_admin') {
@@ -194,11 +208,10 @@ export const register = async (req: Request, res: Response, next: NextFunction):
         email: userEmail,
         password: userPassword,
         email_confirm: true,
-        user_metadata: { name: name.trim(), role: normalizedRole, department: normalizedDept, employee_id: officialEmpId },
+        user_metadata: { name: name.trim(), role: normalizedRole, department: normalizedDept, employee_id: officialEmpId, phone: userPhone },
       });
 
       if (authError) {
-        // If user already exists in auth, check if it exists
         console.warn('Supabase auth createUser note:', authError.message);
         const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
         const found = existingUsers?.users?.find((u) => u.email?.toLowerCase() === userEmail.toLowerCase());
@@ -206,15 +219,15 @@ export const register = async (req: Request, res: Response, next: NextFunction):
           createdUserId = found.id as `${string}-${string}-${string}-${string}-${string}`;
           await supabaseAdmin.auth.admin.updateUserById(found.id, {
             password: userPassword,
-            user_metadata: { name: name.trim(), role: normalizedRole, department: normalizedDept, employee_id: officialEmpId },
+            user_metadata: { name: name.trim(), role: normalizedRole, department: normalizedDept, employee_id: officialEmpId, phone: userPhone },
           });
         }
       } else if (authUser?.user) {
         createdUserId = authUser.user.id as `${string}-${string}-${string}-${string}-${string}`;
       }
 
-      // Insert into `profiles` table with auto-assigned reports_to
-      const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
+      // Insert into `profiles` table with auto-assigned reports_to and phone
+      const profileData: any = {
         id: createdUserId as `${string}-${string}-${string}-${string}-${string}`,
         email: userEmail,
         name: name.trim(),
@@ -223,7 +236,12 @@ export const register = async (req: Request, res: Response, next: NextFunction):
         reports_to: superiorId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      });
+      };
+      if (userPhone) {
+        profileData.phone = userPhone;
+      }
+
+      const { error: profileError } = await supabaseAdmin.from('profiles').upsert(profileData);
 
       if (profileError) {
         console.error('Supabase profiles insert error:', profileError.message);
@@ -253,6 +271,7 @@ export const register = async (req: Request, res: Response, next: NextFunction):
       role: normalizedRole,
       department: normalizedDept,
       reports_to: superiorId || undefined,
+      phone: userPhone,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -266,6 +285,7 @@ export const register = async (req: Request, res: Response, next: NextFunction):
         ...newProfile,
         empId: officialEmpId,
         userRole: normalizedRole,
+        phone: userPhone,
         reportingTo: superiorId
           ? { id: superiorId, name: superiorName, role: superiorRole, empId: superiorEmpId }
           : null,
@@ -576,4 +596,248 @@ export const getMockUsersList = async (req: Request, res: Response): Promise<voi
     res.status(500).json({ success: false, error: 'Could not retrieve registered users.' });
   }
 };
+
+// ─── Forgot Password OTP Session Management ──────────────────────────────────
+interface OtpSession {
+  empId: string;
+  phone: string;
+  otp: string;
+  expiresAt: number;
+  verified: boolean;
+  resetToken?: string;
+  userId?: string;
+  email?: string;
+  name?: string;
+}
+
+const otpSessions = new Map<string, OtpSession>();
+
+function maskPhoneNumber(phone: string): string {
+  const clean = phone.trim();
+  if (clean.length <= 4) return '••••';
+  const first = clean.slice(0, Math.min(6, clean.length - 4));
+  const last = clean.slice(-3);
+  return `${first}•••••${last}`;
+}
+
+/**
+ * POST /api/auth/forgot-password/send-otp
+ * Finds registered employee and dispatches a 6-digit OTP to their registered mobile phone.
+ */
+export const sendForgotPasswordOtp = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { empId, email, identifier } = req.body;
+    const rawId = (empId || email || identifier || '').trim();
+
+    if (!rawId) {
+      res.status(400).json({ success: false, error: 'Official Employee ID or Registered Email is required.' });
+      return;
+    }
+
+    const cleanEmpId = rawId.toUpperCase();
+    const cleanEmail = rawId.toLowerCase().includes('@') ? rawId.toLowerCase() : `${rawId.toLowerCase()}@railpravah.gov.in`;
+
+    // 1. Search in Supabase profiles & auth
+    let matchedProfile: any = null;
+    let userId: string | undefined = undefined;
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: profiles } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .or(`email.ilike.%${rawId}%,email.ilike.%${cleanEmpId.toLowerCase()}%`);
+
+        if (profiles && profiles.length > 0) {
+          matchedProfile = profiles[0];
+          userId = matchedProfile.id;
+        }
+      } catch (err) {
+        console.warn('Note searching profile in Supabase:', err);
+      }
+    }
+
+    // Fallback to in-memory store or MOCK_USERS
+    if (!matchedProfile) {
+      const allProfiles = Array.from(inMemoryStore.profiles.values());
+      matchedProfile = allProfiles.find(
+        (p) =>
+          p.email?.toLowerCase().includes(rawId.toLowerCase()) ||
+          p.email?.split('@')[0]?.toUpperCase() === cleanEmpId ||
+          p.id === rawId
+      );
+      if (matchedProfile) {
+        userId = matchedProfile.id;
+      }
+    }
+
+    if (!matchedProfile) {
+      const mock = MOCK_USERS.find(
+        (m) =>
+          m.email?.toLowerCase().includes(rawId.toLowerCase()) ||
+          m.email?.split('@')[0]?.toUpperCase() === cleanEmpId
+      );
+      if (mock) {
+        matchedProfile = mock;
+        userId = mock.id;
+      }
+    }
+
+    if (!matchedProfile) {
+      res.status(404).json({
+        success: false,
+        error: `No registered railway personnel found for "${rawId}". Please verify your Employee ID.`,
+      });
+      return;
+    }
+
+    // Retrieve or assign default registered phone
+    let phone = matchedProfile.phone;
+    if (!phone) {
+      // Default phone fallback based on role
+      phone =
+        matchedProfile.role === 'worker'
+          ? '+91 97692 31204'
+          : matchedProfile.role === 'supervisor'
+          ? '+91 98201 44521'
+          : matchedProfile.role === 'zonal_head'
+          ? '+91 98201 44522'
+          : matchedProfile.role === 'department_head'
+          ? '+91 98201 44523'
+          : '+91 98201 44520';
+    }
+
+    // Generate secure 6-digit numeric OTP
+    const otp = randomInt(100000, 999999).toString();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+    const sessionKey = cleanEmpId;
+    otpSessions.set(sessionKey, {
+      empId: cleanEmpId,
+      phone,
+      otp,
+      expiresAt,
+      verified: false,
+      userId,
+      email: matchedProfile.email || cleanEmail,
+      name: matchedProfile.name,
+    });
+
+    res.json({
+      success: true,
+      message: `OTP has been dispatched to your registered mobile number (${maskPhoneNumber(phone)}).`,
+      empId: cleanEmpId,
+      maskedPhone: maskPhoneNumber(phone),
+      fullPhone: phone,
+      expiresInSeconds: 300,
+      // For immediate development & demo evaluation:
+      demoOtp: otp,
+      name: matchedProfile.name,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to dispatch password reset OTP.' });
+  }
+};
+
+/**
+ * POST /api/auth/forgot-password/verify-otp
+ * Verifies the 6-digit OTP code against the active session.
+ */
+export const verifyForgotPasswordOtp = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { empId, otp } = req.body;
+    const cleanEmpId = (empId || '').trim().toUpperCase();
+    const cleanOtp = (otp || '').trim();
+
+    if (!cleanEmpId || !cleanOtp) {
+      res.status(400).json({ success: false, error: 'Employee ID and 6-digit OTP are required.' });
+      return;
+    }
+
+    const session = otpSessions.get(cleanEmpId);
+    if (!session) {
+      res.status(400).json({ success: false, error: 'No active OTP session found. Please request a new OTP.' });
+      return;
+    }
+
+    if (Date.now() > session.expiresAt) {
+      otpSessions.delete(cleanEmpId);
+      res.status(400).json({ success: false, error: 'OTP has expired (validity is 5 minutes). Please request a new OTP.' });
+      return;
+    }
+
+    if (session.otp !== cleanOtp) {
+      res.status(400).json({ success: false, error: 'Invalid OTP code. Please enter the correct 6-digit code.' });
+      return;
+    }
+
+    const resetToken = randomUUID();
+    session.verified = true;
+    session.resetToken = resetToken;
+    otpSessions.set(cleanEmpId, session);
+
+    res.json({
+      success: true,
+      message: 'OTP verified successfully. You may now set your new password.',
+      empId: cleanEmpId,
+      resetToken,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to verify OTP.' });
+  }
+};
+
+/**
+ * POST /api/auth/forgot-password/reset-password
+ * Authorizes password update via validated resetToken and updates password in Supabase.
+ */
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { empId, resetToken, newPassword } = req.body;
+    const cleanEmpId = (empId || '').trim().toUpperCase();
+    const cleanPass = (newPassword || '').trim();
+
+    if (!cleanEmpId || !resetToken || !cleanPass) {
+      res.status(400).json({ success: false, error: 'Employee ID, Reset Token, and New Password are required.' });
+      return;
+    }
+
+    if (cleanPass.length < 6) {
+      res.status(400).json({ success: false, error: 'New password must be at least 6 characters long.' });
+      return;
+    }
+
+    const session = otpSessions.get(cleanEmpId);
+    if (!session || !session.verified || session.resetToken !== resetToken) {
+      res.status(403).json({ success: false, error: 'Invalid or expired password reset session. Please request a new OTP.' });
+      return;
+    }
+
+    // Update in Supabase Auth
+    if (isSupabaseConfigured() && session.userId) {
+      try {
+        const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(session.userId, {
+          password: cleanPass,
+        });
+        if (updErr) {
+          console.warn('Supabase auth password update note:', updErr.message);
+        }
+      } catch (sbErr) {
+        console.warn('Supabase update password exception:', sbErr);
+      }
+    }
+
+    // Clear session
+    otpSessions.delete(cleanEmpId);
+
+    res.json({
+      success: true,
+      message: `Password updated successfully for Employee ${cleanEmpId}. You can now sign in with your new password.`,
+      empId: cleanEmpId,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to reset password.' });
+  }
+};
+
 

@@ -53,6 +53,7 @@ export const MOCK_USERS = [
     role: 'coa_admin' as UserRole,
     department: null,
     reports_to: null,
+    phone: '+91 98201 44520',
   },
   // Civil
   {
@@ -62,6 +63,7 @@ export const MOCK_USERS = [
     role: 'department_head' as UserRole,
     department: 'civil' as DepartmentType,
     reports_to: null,
+    phone: '+91 98201 44523',
   },
   {
     id: 'c1000000-0000-0000-0000-000000000002',
@@ -70,6 +72,7 @@ export const MOCK_USERS = [
     role: 'zonal_head' as UserRole,
     department: 'civil' as DepartmentType,
     reports_to: 'c1000000-0000-0000-0000-000000000001',
+    phone: '+91 98201 44522',
   },
   {
     id: 'c1000000-0000-0000-0000-000000000003',
@@ -78,6 +81,7 @@ export const MOCK_USERS = [
     role: 'supervisor' as UserRole,
     department: 'civil' as DepartmentType,
     reports_to: 'c1000000-0000-0000-0000-000000000002',
+    phone: '+91 98201 44521',
   },
   {
     id: 'c1000000-0000-0000-0000-000000000004',
@@ -86,6 +90,7 @@ export const MOCK_USERS = [
     role: 'worker' as UserRole,
     department: 'civil' as DepartmentType,
     reports_to: 'c1000000-0000-0000-0000-000000000003',
+    phone: '+91 97692 31204',
   },
   // Electrical
   {
@@ -95,6 +100,7 @@ export const MOCK_USERS = [
     role: 'department_head' as UserRole,
     department: 'electrical' as DepartmentType,
     reports_to: null,
+    phone: '+91 98201 44530',
   },
   {
     id: 'e2000000-0000-0000-0000-000000000002',
@@ -103,6 +109,7 @@ export const MOCK_USERS = [
     role: 'zonal_head' as UserRole,
     department: 'electrical' as DepartmentType,
     reports_to: 'e2000000-0000-0000-0000-000000000001',
+    phone: '+91 98201 44531',
   },
   {
     id: 'e2000000-0000-0000-0000-000000000003',
@@ -111,6 +118,7 @@ export const MOCK_USERS = [
     role: 'supervisor' as UserRole,
     department: 'electrical' as DepartmentType,
     reports_to: 'e2000000-0000-0000-0000-000000000002',
+    phone: '+91 98201 44532',
   },
   {
     id: 'e2000000-0000-0000-0000-000000000004',
@@ -119,6 +127,7 @@ export const MOCK_USERS = [
     role: 'worker' as UserRole,
     department: 'electrical' as DepartmentType,
     reports_to: 'e2000000-0000-0000-0000-000000000003',
+    phone: '+91 97692 31205',
   },
   // S&T
   {
@@ -128,6 +137,7 @@ export const MOCK_USERS = [
     role: 'department_head' as UserRole,
     department: 'signal_comm' as DepartmentType,
     reports_to: null,
+    phone: '+91 98201 44540',
   },
   {
     id: 'd3000000-0000-0000-0000-000000000002',
@@ -136,6 +146,7 @@ export const MOCK_USERS = [
     role: 'zonal_head' as UserRole,
     department: 'signal_comm' as DepartmentType,
     reports_to: 'd3000000-0000-0000-0000-000000000001',
+    phone: '+91 98201 44541',
   },
   {
     id: 'd3000000-0000-0000-0000-000000000003',
@@ -144,6 +155,7 @@ export const MOCK_USERS = [
     role: 'supervisor' as UserRole,
     department: 'signal_comm' as DepartmentType,
     reports_to: 'd3000000-0000-0000-0000-000000000002',
+    phone: '+91 98201 44542',
   },
   {
     id: 'd3000000-0000-0000-0000-000000000004',
@@ -152,5 +164,6 @@ export const MOCK_USERS = [
     role: 'worker' as UserRole,
     department: 'signal_comm' as DepartmentType,
     reports_to: 'd3000000-0000-0000-0000-000000000003',
+    phone: '+91 97692 31206',
   },
 ];

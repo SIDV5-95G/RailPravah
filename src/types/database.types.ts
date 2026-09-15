@@ -11,6 +11,7 @@ export interface UserProfile {
   role: UserRole;
   department: DepartmentType | null;
   reports_to?: string | null;
+  phone?: string | null;
   created_at?: string;
   updated_at?: string;
 }

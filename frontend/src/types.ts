@@ -695,6 +695,7 @@ export interface UserProfile {
   userRole: UserRole;
   avatarUrl: string;
   isLoggedIn: boolean;
+  phone?: string | null;
   authProvider?: "google" | "railway_sso";
   reports_to?: string | null;
   reportingTo?: {
