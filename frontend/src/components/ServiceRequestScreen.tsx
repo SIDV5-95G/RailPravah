@@ -36,11 +36,16 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
   onSendToScheduler,
   currentUser,
 }) => {
-  const isZonalHead = currentUser?.userRole === "zonal_head";
+  const isAuthorized =
+    currentUser?.userRole === "zonal_head" ||
+    currentUser?.userRole === "department_head" ||
+    currentUser?.userRole === "department_user";
   const [taskName, setTaskName] = useState("Track Deep Screening & Ballast Packing");
   const [department, setDepartment] = useState<DepartmentType>("Engineering");
   const [trackArea, setTrackArea] = useState("Kurla - Thane");
   const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState<PriorityType>("High");
+  const [timePeriodType, setTimePeriodType] = useState<MaintenancePeriodType>("weekly");
   const [preferredSlot, setPreferredSlot] = useState(() => {
     const tmr = new Date();
     tmr.setDate(tmr.getDate() + 1);
@@ -53,12 +58,18 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isZonalHead) {
+    if (!isAuthorized) {
       return;
     }
     if (!description.trim() || !taskName.trim()) {
       return;
     }
+
+    const submitterLabel =
+      currentUser?.name ||
+      (currentUser?.userRole === "department_head" || currentUser?.userRole === "department_user"
+        ? "Principal Chief Engineer (Dept Head)"
+        : "Chief Track Engineer (Zonal Head)");
 
     onSubmitRequest({
       taskName: taskName.trim(),
@@ -70,7 +81,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
       status: "Pending",
       timePeriodType,
       customTimePeriod: timePeriodType === "manual" ? customTimePeriod.trim() : undefined,
-      submittedBy: currentUser?.name || "Chief Track Engineer (Zonal Head)",
+      submittedBy: submitterLabel,
     });
 
     setDescription("");
@@ -215,32 +226,32 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Col: Request Form */}
         <div className="lg:col-span-5 bg-white border border-[#c7c4d8] rounded-lg shadow-xs overflow-hidden">
-          <div className={`p-4 border-b flex items-center justify-between ${isZonalHead ? "bg-[#fafafa] border-[#c7c4d8]" : "bg-[#fff8f8] border-[#ffdad6]"}`}>
+          <div className={`p-4 border-b flex items-center justify-between ${isAuthorized ? "bg-[#fafafa] border-[#c7c4d8]" : "bg-[#fff8f8] border-[#ffdad6]"}`}>
             <div>
               <h2 className="text-[14px] font-bold text-[#191c1e] uppercase tracking-wider">Service Request Submission</h2>
-              {isZonalHead ? (
+              {isAuthorized ? (
                 <span className="text-[11px] text-[#155724] font-semibold flex items-center gap-1 mt-0.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#28a745]" />
-                  Authorized: Chief Track Engineer (Zonal Head)
+                  Authorized: {currentUser?.userRole === "department_head" || currentUser?.userRole === "department_user" ? "Principal Chief Engineer (Dept Head)" : "Chief Track Engineer (Zonal Head)"}
                 </span>
               ) : (
                 <span className="text-[11px] text-[#ba1a1a] font-semibold flex items-center gap-1 mt-0.5">
                   <Lock className="w-3.5 h-3.5 text-[#ba1a1a]" />
-                  Restricted: Zonal Head authorization required
+                  Restricted: Zonal Head or Department Head authorization required
                 </span>
               )}
             </div>
-            <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${isZonalHead ? "text-[#3525cd] bg-[#e2dfff]" : "text-[#ba1a1a] bg-[#ffdad6]"}`}>
-              {isZonalHead ? "FORM TR-01" : "READ-ONLY"}
+            <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${isAuthorized ? "text-[#3525cd] bg-[#e2dfff]" : "text-[#ba1a1a] bg-[#ffdad6]"}`}>
+              {isAuthorized ? "FORM TR-01" : "READ-ONLY"}
             </span>
           </div>
 
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
-            {!isZonalHead && (
+            {!isAuthorized && (
               <div className="p-3 bg-[#fff3cd] border border-[#ffeeba] text-[#856404] text-xs rounded-md flex items-start gap-2">
                 <Lock className="w-4 h-4 text-[#856404] shrink-0 mt-0.5" />
                 <div className="leading-relaxed">
-                  <strong>Permission Restricted:</strong> Only the <strong>Chief Track Engineer (Zonal Head)</strong> is authorized to submit new service requests through this portal. Personnel with other roles can review existing active requests in the registry on the right.
+                  <strong>Permission Restricted:</strong> Only <strong>Chief Track Engineer (Zonal Head)</strong> and <strong>Principal Chief Engineer (Dept Head)</strong> are authorized to submit new service requests through this portal. Personnel with other roles can review existing active requests in the registry on the right.
                 </div>
               </div>
             )}
@@ -253,10 +264,10 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
                 id="req-task-name-input"
                 type="text"
                 required
-                disabled={!isZonalHead}
+                disabled={!isAuthorized}
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
-                placeholder={isZonalHead ? "e.g. Track Deep Screening & Ballast Packing on UP Line" : "Submission restricted to Chief Track Engineer (Zonal Head)"}
+                placeholder={isAuthorized ? "e.g. Track Deep Screening & Ballast Packing on UP Line" : "Submission restricted to Authorized Heads"}
                 className="w-full bg-[#f2f4f6] border border-[#c7c4d8] rounded-md py-2 px-3 text-[13px] text-[#191c1e] font-semibold placeholder:text-[#777587] placeholder:font-normal focus:outline-none focus:border-[#3525cd] focus:bg-white focus:ring-1 focus:ring-[#3525cd] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
@@ -270,7 +281,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
                 <button
                   type="button"
                   id="period-opt-weekly"
-                  disabled={!isZonalHead}
+                  disabled={!isAuthorized}
                   onClick={() => setTimePeriodType("weekly")}
                   className={`p-2 rounded-lg border text-left transition-all cursor-pointer ${
                     timePeriodType === "weekly"
@@ -284,7 +295,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
                 <button
                   type="button"
                   id="period-opt-monthly"
-                  disabled={!isZonalHead}
+                  disabled={!isAuthorized}
                   onClick={() => setTimePeriodType("monthly")}
                   className={`p-2 rounded-lg border text-left transition-all cursor-pointer ${
                     timePeriodType === "monthly"
@@ -298,7 +309,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
                 <button
                   type="button"
                   id="period-opt-manual"
-                  disabled={!isZonalHead}
+                  disabled={!isAuthorized}
                   onClick={() => setTimePeriodType("manual")}
                   className={`p-2 rounded-lg border text-left transition-all cursor-pointer ${
                     timePeriodType === "manual"
@@ -312,7 +323,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
                 <button
                   type="button"
                   id="period-opt-none"
-                  disabled={!isZonalHead}
+                  disabled={!isAuthorized}
                   onClick={() => setTimePeriodType("none")}
                   className={`p-2 rounded-lg border text-left transition-all cursor-pointer ${
                     timePeriodType === "none"
@@ -330,7 +341,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
                   <input
                     type="text"
                     id="req-custom-period-input"
-                    disabled={!isZonalHead}
+                    disabled={!isAuthorized}
                     required
                     value={customTimePeriod}
                     onChange={(e) => setCustomTimePeriod(e.target.value)}
@@ -348,7 +359,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
               <select
                 id="req-dept-select"
                 value={department}
-                disabled={!isZonalHead}
+                disabled={!isAuthorized}
                 onChange={(e) => setDepartment(e.target.value as DepartmentType)}
                 className="w-full bg-[#f2f4f6] border border-[#c7c4d8] rounded-md py-2 px-3 text-[13px] text-[#191c1e] focus:outline-none focus:border-[#3525cd] focus:bg-white focus:ring-1 focus:ring-[#3525cd] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
@@ -365,7 +376,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
               <select
                 id="req-track-select"
                 value={trackArea}
-                disabled={!isZonalHead}
+                disabled={!isAuthorized}
                 onChange={(e) => setTrackArea(e.target.value)}
                 className="w-full bg-[#f2f4f6] border border-[#c7c4d8] rounded-md py-2 px-3 text-[13px] text-[#191c1e] focus:outline-none focus:border-[#3525cd] focus:bg-white focus:ring-1 focus:ring-[#3525cd] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
@@ -386,10 +397,10 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
                 id="req-desc-input"
                 rows={3}
                 required
-                disabled={!isZonalHead}
+                disabled={!isAuthorized}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder={isZonalHead ? "e.g. Deep screening, ballast packing on UP Through line, girder bolt inspection..." : "Submission restricted to Chief Track Engineer (Zonal Head)"}
+                placeholder={isAuthorized ? "e.g. Deep screening, ballast packing on UP Through line, girder bolt inspection..." : "Submission restricted to Authorized Heads"}
                 className="w-full bg-[#f2f4f6] border border-[#c7c4d8] rounded-md py-2 px-3 text-[13px] text-[#191c1e] placeholder:text-[#777587] focus:outline-none focus:border-[#3525cd] focus:bg-white focus:ring-1 focus:ring-[#3525cd] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
@@ -402,7 +413,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
                 <select
                   id="req-priority-select"
                   value={priority}
-                  disabled={!isZonalHead}
+                  disabled={!isAuthorized}
                   onChange={(e) => setPriority(e.target.value as PriorityType)}
                   className="w-full bg-[#f2f4f6] border border-[#c7c4d8] rounded-md py-2 px-3 text-[13px] text-[#191c1e] focus:outline-none focus:border-[#3525cd] focus:bg-white focus:ring-1 focus:ring-[#3525cd] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
@@ -420,7 +431,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
                 <input
                   id="req-slot-input"
                   type="text"
-                  disabled={!isZonalHead}
+                  disabled={!isAuthorized}
                   value={preferredSlot}
                   onChange={(e) => setPreferredSlot(e.target.value)}
                   placeholder="YYYY-MM-DD HH:MM"
@@ -432,14 +443,14 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
             <button
               id="req-submit-button"
               type="submit"
-              disabled={!isZonalHead}
+              disabled={!isAuthorized}
               className={`w-full mt-2 py-2.5 px-4 text-white text-[13px] font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 shadow-xs ${
-                isZonalHead
+                isAuthorized
                   ? "bg-[#3525cd] hover:bg-[#4f46e5] active:scale-[0.98] cursor-pointer"
                   : "bg-[#777587] opacity-60 cursor-not-allowed"
               }`}
             >
-              {isZonalHead ? (
+              {isAuthorized ? (
                 <>
                   <Plus className="w-4 h-4" />
                   <span>Submit Service Request</span>
@@ -447,7 +458,7 @@ export const ServiceRequestScreen: React.FC<ServiceRequestScreenProps> = ({
               ) : (
                 <>
                   <Lock className="w-4 h-4" />
-                  <span>Submission Restricted to Zonal Head</span>
+                  <span>Submission Restricted to Zonal & Dept Heads</span>
                 </>
               )}
             </button>

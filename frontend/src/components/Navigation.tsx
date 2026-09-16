@@ -173,6 +173,7 @@ export const Navigation: React.FC<NavigationProps> = ({
         ];
 
       case "department_user":
+      case "department_head":
         return [
           {
             sectionTitle: "Department Head",
