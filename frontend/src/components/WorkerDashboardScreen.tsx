@@ -16,6 +16,7 @@ import {
 import { WorkerTaskCalendar } from "./WorkerTaskCalendar";
 import { HierarchyTabBar } from "./HierarchyTabBar";
 import { ComplaintMediaGallery } from "./ComplaintMediaGallery";
+import { UserAvatar } from "../utils/avatarUtils";
 import {
   WORKER_TEXTS,
   WorkerLanguage,
@@ -729,10 +730,12 @@ export const WorkerDashboardScreen: React.FC<WorkerDashboardScreenProps> = ({
 
           {/* User Profile Info Card */}
           <div className="flex items-center gap-2.5 bg-[#f8f9fa] p-2.5 sm:p-3 rounded-xl border border-[#eceef0] min-w-0 max-w-full">
-            <img
-              src={user.avatarUrl}
-              alt={user.name}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-[#c7c4d8] object-cover shrink-0"
+            <UserAvatar
+              role={user.userRole || "worker"}
+              name={user.name}
+              avatarUrl={user.avatarUrl}
+              size="md"
+              showBadge={true}
             />
             <div className="text-xs min-w-0">
               <div

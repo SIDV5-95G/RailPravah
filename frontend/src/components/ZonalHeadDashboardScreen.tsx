@@ -13,6 +13,7 @@ import { HierarchyTabBar } from "./HierarchyTabBar";
 import { HierarchicalIssueInbox } from "./HierarchicalIssueInbox";
 import { ZonalDailyScheduleCalendar } from "./ZonalDailyScheduleCalendar";
 import { ZonalMaintenanceCalendarModal } from "./ZonalMaintenanceCalendarModal";
+import { UserAvatar } from "../utils/avatarUtils";
 import {
   ShieldCheck,
   Building2,
@@ -156,10 +157,12 @@ export const ZonalHeadDashboardScreen: React.FC<ZonalHeadDashboardScreenProps> =
           </button>
 
           <div className="flex items-center gap-3 bg-[#f8f9fa] p-3 rounded-xl border border-[#eceef0] min-w-0 max-w-full">
-            <img
-              src={zonalUser.avatarUrl}
-              alt={zonalUser.name}
-              className="w-10 h-10 rounded-full border border-[#c7c4d8] object-cover shrink-0"
+            <UserAvatar
+              role={zonalUser.userRole || "zonal_head"}
+              name={zonalUser.name}
+              avatarUrl={zonalUser.avatarUrl}
+              size="md"
+              showBadge={true}
             />
             <div className="text-xs min-w-0">
               <div className="font-bold text-[#191c1e] truncate max-w-[180px] sm:max-w-[220px]" title={zonalUser.name}>

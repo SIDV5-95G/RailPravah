@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import appLogo from "../assets/logo.png";
 import { UserProfile, DepartmentType, UserRole } from "../types";
+import { getRoleAvatarUrl } from "../utils/avatarUtils";
 import {
   ShieldCheck,
   Lock,
@@ -319,17 +320,7 @@ export const LoginRegistrationScreen: React.FC<LoginRegistrationScreenProps> = (
 
       const rawRole = data.user.userRole || data.user.role || detectedMaintenanceRole?.role || "supervisor";
       const verifiedRole: UserRole = rawRole === "department_head" ? "department_user" : rawRole;
-      let userAvatar =
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
-      if (verifiedRole === "zonal_head") {
-        userAvatar = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80";
-      } else if (verifiedRole === "worker") {
-        userAvatar = "https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&auto=format&fit=crop&q=80";
-      } else if (verifiedRole === "department_user" || (verifiedRole as string) === "department_head") {
-        userAvatar = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80";
-      } else if (verifiedRole === "supervisor") {
-        userAvatar = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80";
-      }
+      const userAvatar = getRoleAvatarUrl(verifiedRole);
 
       let mappedDept: DepartmentType = "Engineering";
       const rawDept = (data.user.department || "").toLowerCase();
@@ -346,7 +337,7 @@ export const LoginRegistrationScreen: React.FC<LoginRegistrationScreenProps> = (
         department: mappedDept,
         role: data.user.role || "Railway Maintenance Personnel",
         userRole: verifiedRole,
-        avatarUrl: data.user.avatarUrl || userAvatar,
+        avatarUrl: getRoleAvatarUrl(verifiedRole, data.user.avatarUrl),
         isLoggedIn: true,
         reports_to: data.user.reports_to || null,
         reportingTo: data.user.reportingTo || null,
@@ -416,8 +407,7 @@ export const LoginRegistrationScreen: React.FC<LoginRegistrationScreenProps> = (
         department: "Operations",
         role: "Chief COA Traffic & Power Block Controller",
         userRole: "coa_admin",
-        avatarUrl:
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuC5sQPcjKJuVrfbGreHMaN4Smsm4Vt1ip5elxKPcfVbg_lnsKPqE2x4blO3Q-a-1nR01v1L-hRKRn5jL72vSHEkoj3gKsrQor4uhptnrvg6d8FfJWP4bolJ5INITzW8r_cihIvYIuizvD47KYt5azuqgewC3BT9WHV-fzDsERVanjhluAYabf2h5tHc2uCgpYvoZDzGsDQo6Y-kYrrPA9yRwjLWha8WpiglRn_C2ODGH8GHx0-PAn2T",
+        avatarUrl: getRoleAvatarUrl("coa_admin"),
         isLoggedIn: true,
       };
 
@@ -525,8 +515,7 @@ export const LoginRegistrationScreen: React.FC<LoginRegistrationScreenProps> = (
         department: regDept,
         role: userRoleTitle,
         userRole: regRole,
-        avatarUrl:
-          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        avatarUrl: getRoleAvatarUrl(regRole),
         isLoggedIn: true,
         reports_to: data.user.reports_to || null,
         reportingTo: data.user.reportingTo || null,

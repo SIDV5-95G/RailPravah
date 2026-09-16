@@ -3,6 +3,7 @@ import { CalendarBlock, ScreenType, UserProfile, UserRole, SectionFieldGroup, Ca
 import { HierarchyTabBar } from "./HierarchyTabBar";
 import { HierarchicalIssueInbox } from "./HierarchicalIssueInbox";
 import { UnifiedDailyScheduleCalendar } from "./UnifiedDailyScheduleCalendar";
+import { UserAvatar } from "../utils/avatarUtils";
 import {
   UserCheck,
   ShieldCheck,
@@ -347,10 +348,12 @@ export const SupervisorDashboardScreen: React.FC<SupervisorDashboardScreenProps>
         </div>
 
         <div className="flex items-center gap-3 bg-[#f8f9fa] p-3 rounded-xl border border-[#eceef0] min-w-0 max-w-full">
-          <img
-            src={supervisorUser.avatarUrl}
-            alt={supervisorUser.name}
-            className="w-10 h-10 rounded-full border border-[#c7c4d8] object-cover shrink-0"
+          <UserAvatar
+            role={supervisorUser.userRole || "supervisor"}
+            name={supervisorUser.name}
+            avatarUrl={supervisorUser.avatarUrl}
+            size="md"
+            showBadge={true}
           />
           <div className="text-xs min-w-0">
             <div className="font-bold text-[#191c1e] truncate max-w-[180px] sm:max-w-[220px]" title={supervisorUser.name}>

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import appLogo from "../assets/logo.png";
 import { PravahSlotNotification, ScreenType, UserProfile, UserRole } from "../types";
 import { OperationalNotificationsModal } from "./OperationalNotificationsModal";
+import { UserAvatar } from "../utils/avatarUtils";
 import {
   Wrench,
   Brain,
@@ -382,10 +383,12 @@ export const Navigation: React.FC<NavigationProps> = ({
 
           {/* User Profile Pill */}
           <div className="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 border-l border-[#c7c4d8]/40">
-            <img
-              src={user.avatarUrl}
-              alt={user.name}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-[#c7c4d8] object-cover"
+            <UserAvatar
+              role={user.userRole}
+              name={user.name}
+              avatarUrl={user.avatarUrl}
+              size="sm"
+              showBadge={true}
             />
             <div className="hidden xl:flex flex-col text-left">
               <span className="text-[12px] font-semibold text-[#191c1e] leading-tight flex items-center gap-1">
@@ -559,14 +562,13 @@ export const Navigation: React.FC<NavigationProps> = ({
               className="p-2 bg-white/70 border-b border-[#c7c4d8]/60 flex items-center justify-center"
               title={`${user.name} (${user.role}) • Emp ID: ${user.empId}`}
             >
-              <div className="relative">
-                <img
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  className="w-8 h-8 rounded-full border border-[#c7c4d8] object-cover"
-                />
-                <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full ring-2 ring-white" />
-              </div>
+              <UserAvatar
+                role={user.userRole}
+                name={user.name}
+                avatarUrl={user.avatarUrl}
+                size="sm"
+                showOnline={true}
+              />
             </div>
           ) : (
             <div className="px-3.5 py-2.5 bg-white/70 border-b border-[#c7c4d8]/60">

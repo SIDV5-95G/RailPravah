@@ -18,6 +18,7 @@ import { HierarchyTabBar } from "./HierarchyTabBar";
 import { UnifiedDailyScheduleCalendar } from "./UnifiedDailyScheduleCalendar";
 import { CoaProvidePlanModal } from "./CoaProvidePlanModal";
 import { ZonalMaintenanceCalendarModal } from "./ZonalMaintenanceCalendarModal";
+import { UserAvatar } from "../utils/avatarUtils";
 import {
   Calendar,
   Layers,
@@ -661,10 +662,12 @@ export const CoaManagementScreen: React.FC<CoaManagementScreenProps> = ({
 
         {/* User Profile Info Card */}
         <div className="flex items-center gap-3 bg-[#f8f9fa] border border-[#eceef0] rounded-xl p-3 min-w-0 max-w-full">
-          <img
-            src={user.avatarUrl}
-            alt={user.name}
-            className="w-10 h-10 rounded-full border border-[#c7c4d8] object-cover shrink-0"
+          <UserAvatar
+            role={user.userRole || "coa_admin"}
+            name={user.name}
+            avatarUrl={user.avatarUrl}
+            size="md"
+            showBadge={true}
           />
           <div className="text-xs min-w-0">
             <div className="font-bold text-[#191c1e] truncate max-w-[180px] sm:max-w-[220px]" title={user.name}>

@@ -3,6 +3,7 @@ import { CalendarBlock, ScreenType, UserProfile, UserRole } from "../types";
 import { HierarchyTabBar } from "./HierarchyTabBar";
 import { HierarchicalIssueInbox } from "./HierarchicalIssueInbox";
 import { UnifiedDailyScheduleCalendar } from "./UnifiedDailyScheduleCalendar";
+import { UserAvatar } from "../utils/avatarUtils";
 import {
   Building2,
   CheckCircle2,
@@ -217,10 +218,12 @@ export const DepartmentHeadDashboardScreen: React.FC<DepartmentHeadDashboardScre
         </div>
 
         <div className="flex items-center gap-3 bg-[#f8f9fa] p-3 rounded-xl border border-[#eceef0] min-w-0 max-w-full">
-          <img
-            src={deptUser.avatarUrl}
-            alt={deptUser.name}
-            className="w-10 h-10 rounded-full border border-[#c7c4d8] object-cover shrink-0"
+          <UserAvatar
+            role={deptUser.userRole || "department_head"}
+            name={deptUser.name}
+            avatarUrl={deptUser.avatarUrl}
+            size="md"
+            showBadge={true}
           />
           <div className="text-xs min-w-0">
             <div className="font-bold text-[#191c1e] truncate max-w-[180px] sm:max-w-[220px]" title={deptUser.name}>

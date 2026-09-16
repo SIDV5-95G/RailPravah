@@ -167,8 +167,7 @@ export const INITIAL_USER: UserProfile = {
   department: "Engineering",
   role: "Guest",
   userRole: "worker",
-  avatarUrl:
-    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+  avatarUrl: "",
   isLoggedIn: false,
 };
 

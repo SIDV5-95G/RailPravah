@@ -22,6 +22,7 @@ import {
   INITIAL_USER,
   DEMO_USER_PROFILES,
 } from "./mockData";
+import { getRoleAvatarUrl } from "./utils/avatarUtils";
 import { Navigation } from "./components/Navigation";
 import { LoginRegistrationScreen } from "./components/LoginRegistrationScreen";
 import { ServiceRequestScreen } from "./components/ServiceRequestScreen";
@@ -365,9 +366,7 @@ export const App: React.FC = () => {
               role: data.role || "Worker Gr-IV",
               userRole: data.userRole || "worker",
               avatarUrl:
-                fbUser.photoURL ||
-                data.avatarUrl ||
-                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+                getRoleAvatarUrl(data.userRole || "worker", fbUser.photoURL || data.avatarUrl),
               isLoggedIn: true,
               authProvider: "google",
             };
